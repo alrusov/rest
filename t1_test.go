@@ -190,8 +190,6 @@ func TestComplex(t *testing.T) {
 			}
 		}
 
-		//misc.Sleep(34444 * time.Second)
-
 	}()
 
 	err = testH.h.Start()
