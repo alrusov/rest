@@ -148,7 +148,7 @@ func Handler(id uint64, prefix string, path string, w http.ResponseWriter, r *ht
 	params := &Params{
 		ID:        id,
 		Prefix:    prefix,
-		Path:      base,
+		Path:      path,
 		W:         w,
 		R:         r,
 		Base:      base,

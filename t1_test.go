@@ -59,7 +59,7 @@ func TestComplex(t *testing.T) {
 
 	listenerCfg := &config.Listener{
 		Addr:    fmt.Sprintf("127.0.0.1:%d", testPort),
-		Timeout: 5 * time.Second,
+		Timeout: config.Duration(5 * time.Second),
 	}
 
 	endpoints := []*testHandler{
@@ -160,7 +160,7 @@ func TestComplex(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(data, *data2) {
-				t.Errorf(`got %#v, expected %#v`, data, *data2)
+				t.Errorf(`got %#v, %#v expected`, data, *data2)
 				return
 			}
 
@@ -185,7 +185,7 @@ func TestComplex(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(data, testH.list) {
-				t.Errorf(`got %#v, expected %#v`, data, testH.list)
+				t.Errorf(`got %#v, %#v expected`, data, testH.list)
 				return
 			}
 		}
@@ -359,7 +359,7 @@ func TestGetOptions(t *testing.T) {
 		options := strings.Trim(p.path[len(p.base):], "/")
 
 		if options != p.options {
-			t.Errorf(`%d: got "%s", expected "%s"`, i, options, p.options)
+			t.Errorf(`%d: got "%s", "%s" expected`, i, options, p.options)
 		}
 	}
 }
