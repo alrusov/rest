@@ -8,46 +8,75 @@ import (
 //----------------------------------------------------------------------------------------------------------------------------//
 
 func TestParser(t *testing.T) {
-	// unsorted!
-	src := [][]struct {
-		expr string
-		dest string
-	}{
-		// Active or blocked users in group with ID=gid
-		{
-			{expr: `group`, dest: `command`},
-			{expr: `\d+`, dest: `gid`},
-			{expr: `active|blocked`, dest: `sub_command`},
-		},
-		// Active or blocked users
-		{
-			{expr: `active|blocked`, dest: `command`},
-		},
-		// User by ID
-		{
-			{expr: `\d+`, dest: `id`},
-		},
-		// Users in group with ID=gid
-		{
-			{expr: `group`, dest: `command`},
-			{expr: `\d+`, dest: `gid`},
-		},
-		// All users
-		{
-			{expr: ``, dest: `command`},
-		},
 
-		// Illegal 1 -- empty
-		{},
-		// Illegal 2 -- 2 tokens with empty first expression
+	// Check illegal
+	illegal := []*Chains{
 		{
-			{expr: ``, dest: `command`},
-			{expr: `\d+`, dest: `id`},
+			Chains: []Chain{
+				// Illegal 1 -- empty
+				{},
+			},
 		},
-		// Illegal 3 -- bad regexp
 		{
-			{expr: `group`, dest: `command`},
-			{expr: `[\d+`, dest: `gid`},
+			Chains: []Chain{
+				// Illegal 2 -- 2 tokens with empty first expression
+				{
+					{Expr: ``, VarName: `command`},
+					{Expr: `\d+`, VarName: `id`},
+				},
+			},
+		},
+		{
+			Chains: []Chain{
+				// Illegal 3 -- bad regexp
+				{
+					{Expr: `group`, VarName: `command`},
+					{Expr: `[\d+`, VarName: `gid`},
+				},
+			},
+		},
+	}
+
+	for i, c := range illegal {
+		err := c.Prepare()
+		if err == nil {
+			t.Fatalf("[%d] error expected, but not found (%#v)", i, c)
+		}
+	}
+
+	// Check valid
+
+	c := Chains{
+		// unsorted!
+
+		Chains: []Chain{
+			// Active or blocked users in group with ID=gid
+			{
+				{Expr: `group`, VarName: `command`},
+				{Expr: `\d+`, VarName: `gid`},
+				{Expr: `active|blocked`, VarName: `sub_command`},
+			},
+
+			// Active or blocked users
+			{
+				{Expr: `active|blocked`, VarName: `command`},
+			},
+
+			// User by ID
+			{
+				{Expr: `\d+`, VarName: `id`},
+			},
+
+			// Users in group with ID=gid
+			{
+				{Expr: `group`, VarName: `command`},
+				{Expr: `\d+`, VarName: `gid`},
+			},
+
+			// All users
+			{
+				{Expr: ``, VarName: `command`},
+			},
 		},
 	}
 
@@ -179,54 +208,23 @@ func TestParser(t *testing.T) {
 		gid = 0
 	}
 
-	fill := func(fromIdx int) (c *Chains) {
-		c = NewChains(0)
-		for ci, chain := range src[fromIdx:] {
-			idx, err := c.NewChain(0)
-			if err != nil {
-				t.Fatalf(`[%d] %s`, ci, err)
-			}
-
-			for ti, token := range chain {
-				err := c.Add(idx, token.expr, token.dest)
-				if err != nil {
-					t.Fatalf(`[%d.%d] %s`, ci, ti, err)
-				}
-			}
-		}
-		return c
-	}
-
-	for i := 3; i > 0; i-- {
-		ii := len(src) - 1
-
-		c := fill(ii)
-		err := c.Prepare()
-		if err == nil {
-			t.Fatalf("[%d] error expected, but not found", i)
-		}
-
-		src = src[:ii]
-	}
-
-	c := fill(0)
 	err := c.Prepare()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	var prev *chain
+	var prev Chain
 	prevLn := -1
 
-	for _, chain := range c.list {
-		ln := len(chain.tokens)
+	for _, chain := range c.Chains {
+		ln := len(chain)
 		if ln < prevLn {
 			t.Errorf(`Unsorted: %#v after %#v`, chain, prev)
 		}
 		prev = chain
-		prevLn = len(chain.tokens)
+		prevLn = len(chain)
 
-		for _, token := range chain.tokens {
+		for _, token := range chain {
 			if token.re == nil {
 				t.Errorf(`re is nil: %#v`, token)
 			}

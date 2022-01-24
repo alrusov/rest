@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/alrusov/misc"
 )
@@ -15,20 +14,17 @@ import (
 
 type (
 	Chains struct {
-		mutex     *sync.RWMutex
 		prepared  bool
-		list      []*chain
+		Chains    []Chain
 		knownVars misc.BoolMap
 	}
 
-	chain struct {
-		tokens []*token
-	}
+	Chain []*Token
 
-	token struct {
-		expr string
-		dest string
-		re   *regexp.Regexp
+	Token struct {
+		Expr    string
+		VarName string
+		re      *regexp.Regexp
 	}
 
 	Vars misc.InterfaceMap
@@ -36,93 +32,35 @@ type (
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-func NewChains(capacity int) *Chains {
-	return &Chains{
-		mutex:     new(sync.RWMutex),
-		prepared:  false,
-		list:      make([]*chain, 0, capacity),
-		knownVars: make(misc.BoolMap, 16),
-	}
-}
-
-//----------------------------------------------------------------------------------------------------------------------------//
-
-func (c *Chains) NewChain(capacity int) (idx int, err error) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
-	if c.prepared {
-		return -1, fmt.Errorf("already prepared")
-	}
-
-	idx = len(c.list)
-	c.list = append(c.list,
-		&chain{
-			tokens: make([]*token, 0, capacity),
-		},
-	)
-
-	return
-}
-
-//----------------------------------------------------------------------------------------------------------------------------//
-
-func (c *Chains) Add(chainIdx int, expr string, dest string) (err error) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
-	if c.prepared {
-		return fmt.Errorf("already prepared")
-	}
-
-	if chainIdx < 0 || chainIdx >= len(c.list) {
-		return fmt.Errorf(`illegal idx=%d`, chainIdx)
-	}
-
-	if dest == "" {
-		return fmt.Errorf(`empty dest for "%s"`, expr)
-	}
-
-	c.list[chainIdx].tokens = append(c.list[chainIdx].tokens,
-		&token{
-			expr: expr,
-			dest: dest,
-		},
-	)
-
-	c.knownVars[dest] = true
-
-	return
-}
-
-//----------------------------------------------------------------------------------------------------------------------------//
-
 func (c *Chains) Prepare() (err error) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
 	if c.prepared {
 		return fmt.Errorf("already prepared")
 	}
-
-	if len(c.list) == 0 {
-		return fmt.Errorf("is empty")
-	}
-
-	c.prepared = true
 
 	msgs := misc.NewMessages()
 
-	for ci, chain := range c.list {
-		if len(chain.tokens) == 0 {
+	c.knownVars = make(misc.BoolMap, 16)
+
+	for ci, chain := range c.Chains {
+		if len(chain) == 0 {
 			msgs.Add("[%d] chain is empty", ci)
+			continue
 		}
-		for ti, token := range chain.tokens {
-			if token.expr == "" && len(chain.tokens) > 1 {
+
+		for ti, token := range chain {
+			if token.VarName == "" {
+				msgs.Add(`[%d.%d] empty var name for "%s"`, ci, ti, token.Expr)
+				continue
+			}
+
+			c.knownVars[token.VarName] = true
+
+			if token.Expr == "" && len(chain) > 1 {
 				msgs.Add("[%d.%d] an empty expression is allowed only in a chain of one element", ci, ti)
 				continue
 			}
-			token.re, err = regexp.Compile(`^` + token.expr + `$`)
+
+			token.re, err = regexp.Compile(`^` + token.Expr + `$`)
 			if err != nil {
 				msgs.Add("[%d.%d] %s", ci, ti, err)
 				continue
@@ -137,15 +75,14 @@ func (c *Chains) Prepare() (err error) {
 
 	sort.Sort(c)
 
+	c.prepared = true
 	return
+
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
 func (c *Chains) Do(path []string, vars Vars) (found bool, err error) {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
-
 	if !c.prepared {
 		err = fmt.Errorf("not prepared")
 		return
@@ -178,28 +115,27 @@ func (c *Chains) Do(path []string, vars Vars) (found bool, err error) {
 	ln := len(path)
 
 	if ln == 0 &&
-		len(c.list[0].tokens) == 1 &&
-		c.list[0].tokens[0].expr == "" {
+		len(c.Chains[0]) == 1 && c.Chains[0][0].Expr == "" {
 		// Пустой путь
 		found = true
 		return
 	}
 
-	var matched *chain
+	var matched Chain
 
-	for _, chain := range c.list {
-		if len(chain.tokens) < ln {
+	for _, chain := range c.Chains {
+		if len(chain) < ln {
 			continue
 		}
 
-		if len(chain.tokens) > ln {
+		if len(chain) > ln {
 			// Не найдено
 			return
 		}
 
 		matched = chain
 
-		for i, token := range chain.tokens {
+		for i, token := range chain {
 			if !token.re.MatchString(path[i]) {
 				matched = nil
 				break
@@ -216,8 +152,8 @@ func (c *Chains) Do(path []string, vars Vars) (found bool, err error) {
 		return
 	}
 
-	for i, token := range matched.tokens {
-		err = misc.Iface2IfacePtr(path[i], vars[token.dest])
+	for i, token := range matched {
+		err = misc.Iface2IfacePtr(path[i], vars[token.VarName])
 		if err != nil {
 			msgs.AddError(err)
 		}
@@ -237,22 +173,22 @@ func (c *Chains) Do(path []string, vars Vars) (found bool, err error) {
 // Implementing a sort interface for Chains
 
 func (c *Chains) Len() int {
-	return len(c.list)
+	return len(c.Chains)
 }
 
 func (c *Chains) Less(i, j int) bool {
-	ln1 := len(c.list[i].tokens)
-	ln2 := len(c.list[j].tokens)
+	ln1 := len(c.Chains[i])
+	ln2 := len(c.Chains[j])
 
 	if ln1 != ln2 {
 		return ln1 < ln2
 	}
 
-	return strings.Compare(c.list[i].tokens[0].expr, c.list[j].tokens[0].expr) < 0
+	return strings.Compare(c.Chains[i][0].Expr, c.Chains[j][0].Expr) < 0
 }
 
 func (c *Chains) Swap(i, j int) {
-	c.list[i], c.list[j] = c.list[j], c.list[i]
+	c.Chains[i], c.Chains[j] = c.Chains[j], c.Chains[i]
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//
