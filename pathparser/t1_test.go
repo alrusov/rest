@@ -265,7 +265,7 @@ func TestParser(t *testing.T) {
 
 	for i, df := range variants {
 		cleanVars()
-		found, name, err := c.Do(df.path, df.vars)
+		matched, err := c.Do(df.path, df.vars)
 
 		if !df.isErr && err != nil {
 			t.Errorf("[%d] %s (%#v)", i, err, df)
@@ -281,13 +281,19 @@ func TestParser(t *testing.T) {
 			continue
 		}
 
+		found := matched != nil
+
 		if found != df.found {
 			t.Errorf("[%d] found is %v, %v expected  (%#v)", i, found, df.found, df)
 			continue
 		}
 
-		if name != df.name {
-			t.Errorf(`[%d] name is "%s", "%s" expected  (%#v)`, i, name, df.name, df)
+		if !found {
+			continue
+		}
+
+		if matched.Name != df.name {
+			t.Errorf(`[%d] name is "%s", "%s" expected  (%#v)`, i, matched.Name, df.name, df)
 			continue
 		}
 

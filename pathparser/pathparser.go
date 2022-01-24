@@ -87,7 +87,7 @@ func (c *Chains) Prepare() (err error) {
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-func (c *Chains) Do(path []string, vars Vars) (found bool, name string, err error) {
+func (c *Chains) Do(path []string, vars Vars) (matched *Chain, err error) {
 	if !c.prepared {
 		err = fmt.Errorf("not prepared")
 		return
@@ -122,14 +122,13 @@ func (c *Chains) Do(path []string, vars Vars) (found bool, name string, err erro
 	if ln == 0 &&
 		len(c.Chains[0].List) == 1 && c.Chains[0].List[0].Expr == "" {
 		// Пустой путь
-		found = true
-		name = c.Chains[0].Name
+		matched = &c.Chains[0]
 		return
 	}
 
-	var matched *Chain
+	for ci := 0; ci < len(c.Chains); ci++ {
+		chain := &c.Chains[ci]
 
-	for _, chain := range c.Chains {
 		if len(chain.List) < ln {
 			continue
 		}
@@ -139,16 +138,15 @@ func (c *Chains) Do(path []string, vars Vars) (found bool, name string, err erro
 			return
 		}
 
-		matched = &chain
-
 		for i, token := range chain.List {
 			if !token.re.MatchString(path[i]) {
-				matched = nil
+				chain = nil
 				break
 			}
 		}
 
-		if matched != nil {
+		if chain != nil {
+			matched = chain
 			break
 		}
 	}
@@ -167,11 +165,10 @@ func (c *Chains) Do(path []string, vars Vars) (found bool, name string, err erro
 
 	err = msgs.Error()
 	if err != nil {
+		matched = nil
 		return
 	}
 
-	found = true
-	name = matched.Name
 	return
 }
 
