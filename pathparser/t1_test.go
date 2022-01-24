@@ -13,7 +13,7 @@ func TestParser(t *testing.T) {
 		expr string
 		dest string
 	}{
-		// Active or blocked users in group with GroupID
+		// Active or blocked users in group with ID=gid
 		{
 			{expr: `group`, dest: `command`},
 			{expr: `\d+`, dest: `gid`},
@@ -27,7 +27,7 @@ func TestParser(t *testing.T) {
 		{
 			{expr: `\d+`, dest: `id`},
 		},
-		// Users in group with GroupID
+		// Users in group with ID=gid
 		{
 			{expr: `group`, dest: `command`},
 			{expr: `\d+`, dest: `gid`},
@@ -37,14 +37,14 @@ func TestParser(t *testing.T) {
 			{expr: ``, dest: `command`},
 		},
 
-		// Illegal 0
+		// Illegal 1 -- empty
 		{},
-		// Illegal 1
+		// Illegal 2 -- 2 tokens with empty first expression
 		{
 			{expr: ``, dest: `command`},
 			{expr: `\d+`, dest: `id`},
 		},
-		// Illegal 2
+		// Illegal 3 -- bad regexp
 		{
 			{expr: `group`, dest: `command`},
 			{expr: `[\d+`, dest: `gid`},
@@ -67,6 +67,7 @@ func TestParser(t *testing.T) {
 
 	variants := []struct {
 		path     []string
+		vars     Vars
 		expected Vars
 		found    bool
 		isErr    bool
@@ -74,44 +75,100 @@ func TestParser(t *testing.T) {
 		{
 			path:     []string{},
 			expected: Vars{"command": "", "sub_command": "", "id": int(0), "gid": uint32(0)},
+			vars:     vars,
 			found:    true,
 			isErr:    false,
 		},
 		{
 			path:     []string{"24"},
+			vars:     vars,
 			expected: Vars{"command": "", "sub_command": "", "id": int(24), "gid": uint32(0)},
 			found:    true,
 			isErr:    false,
 		},
 		{
 			path:     []string{"active"},
+			vars:     vars,
 			expected: Vars{"command": "active", "sub_command": "", "id": int(0), "gid": uint32(0)},
 			found:    true,
 			isErr:    false,
 		},
 		{
 			path:     []string{"blocked"},
+			vars:     vars,
 			expected: Vars{"command": "blocked", "sub_command": "", "id": int(0), "gid": uint32(0)},
 			found:    true,
 			isErr:    false,
 		},
 		{
 			path:     []string{"group", "335"},
+			vars:     vars,
 			expected: Vars{"command": "group", "sub_command": "", "id": int(0), "gid": uint32(335)},
 			found:    true,
 			isErr:    false,
 		},
 		{
 			path:     []string{"group", "335", "active"},
+			vars:     vars,
 			expected: Vars{"command": "group", "sub_command": "active", "id": int(0), "gid": uint32(335)},
 			found:    true,
 			isErr:    false,
 		},
 		{
 			path:     []string{"group", "335", "blocked"},
+			vars:     vars,
 			expected: Vars{"command": "group", "sub_command": "blocked", "id": int(0), "gid": uint32(335)},
 			found:    true,
 			isErr:    false,
+		},
+		{
+			path:     []string{"123", ""},
+			vars:     vars,
+			expected: Vars{"command": "", "sub_command": "", "id": int(0), "gid": uint32(0)},
+			found:    false,
+			isErr:    false,
+		},
+		{
+			path:     []string{"123", "active"},
+			vars:     vars,
+			expected: Vars{"command": "", "sub_command": "", "id": int(0), "gid": uint32(0)},
+			found:    false,
+			isErr:    false,
+		},
+		{
+			path:     []string{"123", ""},
+			vars:     vars,
+			expected: Vars{"command": "", "sub_command": "", "id": int(0), "gid": uint32(0)},
+			found:    false,
+			isErr:    false,
+		},
+		{
+			path:     []string{"active", "123"},
+			vars:     vars,
+			expected: Vars{"command": "", "sub_command": "", "id": int(0), "gid": uint32(0)},
+			found:    false,
+			isErr:    false,
+		},
+		{
+			path:     []string{""},
+			vars:     Vars{"command": &command, "sub_command": &subCommand, "idXXX": &id, "gid": &gid},
+			expected: Vars{"command": "", "sub_command": "", "id": int(0), "gid": uint32(0)},
+			found:    false,
+			isErr:    true,
+		},
+		{
+			path:     []string{""},
+			vars:     Vars{"command": &command, "sub_command": subCommand, "id": &id, "gid": &gid},
+			expected: Vars{"command": "", "sub_command": "", "id": int(0), "gid": uint32(0)},
+			found:    false,
+			isErr:    true,
+		},
+		{
+			path:     []string{""},
+			vars:     Vars{"sub_command": &subCommand, "id": &id, "gid": &gid},
+			expected: Vars{"command": "", "sub_command": "", "id": int(0), "gid": uint32(0)},
+			found:    false,
+			isErr:    true,
 		},
 	}
 
@@ -178,22 +235,29 @@ func TestParser(t *testing.T) {
 
 	for i, df := range variants {
 		cleanVars()
-		found, err := c.Do(df.path, vars)
+		found, err := c.Do(df.path, df.vars)
+
+		if !df.isErr && err != nil {
+			t.Errorf("[%d] %s (%#v)", i, err, df)
+			continue
+		}
+
+		if df.isErr && err == nil {
+			t.Errorf("[%d] error expected (%#v)", i, df)
+			continue
+		}
 
 		if err != nil {
-			if !df.isErr {
-				t.Errorf("[%d] %s", i, err)
-			}
 			continue
 		}
 
 		if found != df.found {
-			t.Errorf("[%d] found is %v, %v expected", i, found, df.found)
+			t.Errorf("[%d] found is %v, %v expected  (%#v)", i, found, df.found, df)
 			continue
 		}
 
 		if len(vars) != len(df.expected) {
-			t.Errorf("[%d] gor %d variables %d expected", i, len(vars), len(df.expected))
+			t.Errorf("[%d] got %d variables %d expected (%#v)", i, len(vars), len(df.expected), df)
 			continue
 		}
 
@@ -206,7 +270,7 @@ func TestParser(t *testing.T) {
 
 			v := reflect.ValueOf(v).Elem().Interface()
 			if !reflect.DeepEqual(v, expected) {
-				t.Errorf("[%d] %s is %T(%v), %T(%v) expected", i, name, v, v, expected, expected)
+				t.Errorf("[%d] %s is %T(%v), %T(%v) expected (%#v)", i, name, v, v, expected, expected, df)
 				continue
 			}
 		}
