@@ -19,7 +19,10 @@ type (
 		knownVars misc.BoolMap
 	}
 
-	Chain []*Token
+	Chain struct {
+		Name string
+		List []Token
+	}
 
 	Token struct {
 		Expr    string
@@ -42,12 +45,12 @@ func (c *Chains) Prepare() (err error) {
 	c.knownVars = make(misc.BoolMap, 16)
 
 	for ci, chain := range c.Chains {
-		if len(chain) == 0 {
+		if len(chain.List) == 0 {
 			msgs.Add("[%d] chain is empty", ci)
 			continue
 		}
 
-		for ti, token := range chain {
+		for ti, token := range chain.List {
 			if token.VarName == "" {
 				msgs.Add(`[%d.%d] empty var name for "%s"`, ci, ti, token.Expr)
 				continue
@@ -55,16 +58,18 @@ func (c *Chains) Prepare() (err error) {
 
 			c.knownVars[token.VarName] = true
 
-			if token.Expr == "" && len(chain) > 1 {
+			if token.Expr == "" && len(chain.List) > 1 {
 				msgs.Add("[%d.%d] an empty expression is allowed only in a chain of one element", ci, ti)
 				continue
 			}
 
-			token.re, err = regexp.Compile(`^` + token.Expr + `$`)
+			var re *regexp.Regexp
+			re, err = regexp.Compile(`^` + token.Expr + `$`)
 			if err != nil {
 				msgs.Add("[%d.%d] %s", ci, ti, err)
 				continue
 			}
+			chain.List[ti].re = re
 		}
 	}
 
@@ -82,7 +87,7 @@ func (c *Chains) Prepare() (err error) {
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-func (c *Chains) Do(path []string, vars Vars) (found bool, err error) {
+func (c *Chains) Do(path []string, vars Vars) (found bool, name string, err error) {
 	if !c.prepared {
 		err = fmt.Errorf("not prepared")
 		return
@@ -115,27 +120,28 @@ func (c *Chains) Do(path []string, vars Vars) (found bool, err error) {
 	ln := len(path)
 
 	if ln == 0 &&
-		len(c.Chains[0]) == 1 && c.Chains[0][0].Expr == "" {
+		len(c.Chains[0].List) == 1 && c.Chains[0].List[0].Expr == "" {
 		// Пустой путь
 		found = true
+		name = c.Chains[0].Name
 		return
 	}
 
-	var matched Chain
+	var matched *Chain
 
 	for _, chain := range c.Chains {
-		if len(chain) < ln {
+		if len(chain.List) < ln {
 			continue
 		}
 
-		if len(chain) > ln {
+		if len(chain.List) > ln {
 			// Не найдено
 			return
 		}
 
-		matched = chain
+		matched = &chain
 
-		for i, token := range chain {
+		for i, token := range chain.List {
 			if !token.re.MatchString(path[i]) {
 				matched = nil
 				break
@@ -152,7 +158,7 @@ func (c *Chains) Do(path []string, vars Vars) (found bool, err error) {
 		return
 	}
 
-	for i, token := range matched {
+	for i, token := range matched.List {
 		err = misc.Iface2IfacePtr(path[i], vars[token.VarName])
 		if err != nil {
 			msgs.AddError(err)
@@ -165,6 +171,7 @@ func (c *Chains) Do(path []string, vars Vars) (found bool, err error) {
 	}
 
 	found = true
+	name = matched.Name
 	return
 }
 
@@ -177,14 +184,14 @@ func (c *Chains) Len() int {
 }
 
 func (c *Chains) Less(i, j int) bool {
-	ln1 := len(c.Chains[i])
-	ln2 := len(c.Chains[j])
+	ln1 := len(c.Chains[i].List)
+	ln2 := len(c.Chains[j].List)
 
 	if ln1 != ln2 {
 		return ln1 < ln2
 	}
 
-	return strings.Compare(c.Chains[i][0].Expr, c.Chains[j][0].Expr) < 0
+	return strings.Compare(c.Chains[i].List[0].Expr, c.Chains[j].List[0].Expr) < 0
 }
 
 func (c *Chains) Swap(i, j int) {
