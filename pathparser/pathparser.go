@@ -13,25 +13,99 @@ import (
 //----------------------------------------------------------------------------------------------------------------------------//
 
 type (
+	ChainSet struct {
+		Description string `json:"description"`
+		Set         Map    `json:"set"`
+	}
+
+	Map map[For]*Chains
+
+	For uint
+
 	Chains struct {
-		prepared  bool
-		Chains    []Chain
-		knownVars misc.BoolMap
+		Description string `json:"description"`
+		prepared    bool
+		Chains      []Chain `json:"chains"`
+		knownVars   misc.BoolMap
 	}
 
 	Chain struct {
-		Name string
-		List []Token
+		Description string  `json:"description"`
+		Name        string  `json:"-"`
+		List        []Token `json:"list"`
 	}
 
 	Token struct {
-		Expr    string
-		VarName string
+		Expr    string `json:"expr"`
+		VarName string `json:"-"`
 		re      *regexp.Regexp
 	}
 
 	Vars misc.InterfaceMap
 )
+
+const (
+	Create For = iota
+	Get
+	Replace
+	Modify
+	Delete
+)
+
+var (
+	forNames = map[For]string{
+		Create:  "Create",
+		Get:     "Get",
+		Replace: "Replace",
+		Modify:  "Modify",
+		Delete:  "Delete",
+	}
+)
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func (f For) Name() string {
+	return forNames[f]
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func (cs *ChainSet) Prepare() (err error) {
+	msgs := misc.NewMessages()
+
+	for f, c := range cs.Set {
+		err := c.Prepare()
+		if err != nil {
+			msgs.Add(`%s: %s`, f.Name(), err)
+		}
+	}
+
+	return msgs.Error()
+}
+
+func (cs *ChainSet) Do(f For, path []string, vars Vars) (matched *Chain, result interface{}, err error) {
+	c, exists := cs.Set[f]
+	if !exists {
+		return
+	}
+
+	if len(path) == 1 {
+		switch path[0] {
+		case ".info":
+			list := make(map[string]*Chains, len(cs.Set))
+
+			for f, c := range cs.Set {
+				list[f.Name()] = c
+			}
+
+			result = list
+			return
+		}
+	}
+
+	matched, err = c.Do(path, vars)
+	return
+}
 
 //----------------------------------------------------------------------------------------------------------------------------//
 

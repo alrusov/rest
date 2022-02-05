@@ -7,12 +7,11 @@ require (
 	github.com/alrusov/jsonw v0.1.1
 	github.com/alrusov/log v0.1.31
 	github.com/alrusov/misc v0.1.51
-	github.com/alrusov/stdhttp v0.1.99
+	github.com/alrusov/stdhttp v0.1.100
 )
 
 require (
-	github.com/alrusov/auth v0.1.0 // indirect
-	github.com/alrusov/bufpool v0.1.7 // indirect
+	github.com/alrusov/auth v0.1.1 // indirect
 	github.com/alrusov/loadavg v0.1.4 // indirect
 	github.com/alrusov/panic v0.1.14 // indirect
 	github.com/json-iterator/go v1.1.10 // indirect
