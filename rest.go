@@ -235,7 +235,11 @@ func Handler(id uint64, prefix string, path string, w http.ResponseWriter, r *ht
 	} else if data == nil {
 		jData = []byte("{}")
 	} else {
-		jData, code, headers, err = stdhttp.JSONResultWithDataHash(data, withHash, hash, headers)
+		code2 := code
+		jData, code2, headers, err = stdhttp.JSONResultWithDataHash(data, withHash && code%100 == 2, hash, headers)
+		if code2 != http.StatusOK {
+			code = code2
+		}
 		if err != nil {
 			stdhttp.Error(id, false, w, r, code, err.Error(), nil)
 			return
