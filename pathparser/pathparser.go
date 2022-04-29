@@ -138,7 +138,7 @@ func (c *Chains) Prepare() (err error) {
 			}
 
 			var re *regexp.Regexp
-			re, err = regexp.Compile(`^` + token.Expr + `$`)
+			re, err = regexp.Compile(`^(` + token.Expr + `)$`)
 			if err != nil {
 				msgs.Add("[%d.%d] %s", ci, ti, err)
 				continue

@@ -14,6 +14,7 @@ import (
 	"github.com/alrusov/jsonw"
 	"github.com/alrusov/log"
 	"github.com/alrusov/misc"
+	"github.com/alrusov/panic"
 	"github.com/alrusov/stdhttp"
 )
 
@@ -86,6 +87,9 @@ func TestComplex(t *testing.T) {
 	}
 
 	go func() {
+		panicID := panic.ID()
+		defer panic.SaveStackToLogEx(panicID)
+
 		misc.Sleep(3 * time.Second)
 
 		defer testH.h.Stop()
