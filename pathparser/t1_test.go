@@ -284,7 +284,7 @@ func TestParser(t *testing.T) {
 		found := matched != nil
 
 		if found != df.found {
-			t.Errorf("[%d] found is %v, %v expected  (%#v)", i, found, df.found, df)
+			t.Errorf("[%d] found is %v, %v expected (%#v)", i, found, df.found, df)
 			continue
 		}
 

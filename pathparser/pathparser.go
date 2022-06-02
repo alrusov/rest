@@ -5,7 +5,6 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
-	"strings"
 
 	"github.com/alrusov/misc"
 )
@@ -262,7 +261,11 @@ func (c *Chains) Less(i, j int) bool {
 		return ln1 < ln2
 	}
 
-	return strings.Compare(c.Chains[i].List[0].Expr, c.Chains[j].List[0].Expr) < 0
+	if c.Chains[i].List[0].Expr == "" {
+		return c.Chains[j].List[0].Expr != ""
+	}
+
+	return i < j
 }
 
 func (c *Chains) Swap(i, j int) {
