@@ -132,8 +132,9 @@ func Handler(id uint64, prefix string, path string, w http.ResponseWriter, r *ht
 
 	if r.Body != nil {
 		var bodyBuf *bytes.Buffer
-		bodyBuf, _, err := stdhttp.ReadData(r.Header, r.Body)
+		bodyBuf, _, err = stdhttp.ReadData(r.Header, r.Body)
 		if err != nil {
+			stdhttp.Error(id, false, w, r, http.StatusInternalServerError, err.Error(), nil)
 			return
 		}
 		r.Body.Close()

@@ -1,14 +1,14 @@
 module github.com/alrusov/rest
 
-go 1.18
+go 1.19
 
 require (
 	github.com/alrusov/config v0.1.46
 	github.com/alrusov/jsonw v0.1.2
 	github.com/alrusov/log v0.1.32
-	github.com/alrusov/misc v0.1.55
+	github.com/alrusov/misc v0.1.59
 	github.com/alrusov/panic v0.1.14
-	github.com/alrusov/stdhttp v0.1.103
+	github.com/alrusov/stdhttp v0.1.105
 )
 
 require (

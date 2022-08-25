@@ -25,19 +25,21 @@ type (
 		Description string `json:"description"`
 		prepared    bool
 		Chains      []Chain `json:"chains"`
-		knownVars   misc.BoolMap
+		knownVars   map[string]reflect.Kind
 	}
 
 	Chain struct {
 		Description string  `json:"description"`
-		Name        string  `json:"-"`
+		Name        string  `json:"name"`
+		Scope       string  `json:"scope,omitempty"`
 		List        []Token `json:"list"`
 	}
 
 	Token struct {
-		Expr    string `json:"expr"`
-		VarName string `json:"-"`
-		re      *regexp.Regexp
+		Expr       string      `json:"expr"`
+		VarName    string      `json:"varName"`
+		ValPattern interface{} `json:"varPattern"`
+		re         *regexp.Regexp
 	}
 
 	Vars misc.InterfaceMap
@@ -106,6 +108,32 @@ func (cs *ChainSet) Do(f For, path []string, vars Vars) (matched *Chain, result 
 	return
 }
 
+func (cs *ChainSet) Do2(f For, path []string) (matched *Chain, result interface{}, vars Vars, err error) {
+	c, exists := cs.Set[f]
+	if !exists {
+		return
+	}
+
+	vars = make(Vars, len(c.knownVars))
+	for n, k := range c.knownVars {
+		switch k {
+		case reflect.Int64:
+			v := int64(0)
+			vars[n] = &v
+		case reflect.Uint64:
+			v := uint64(0)
+			vars[n] = &v
+		case reflect.String:
+			v := ""
+			vars[n] = &v
+		}
+	}
+
+	matched, result, err = cs.Do(f, path, vars)
+
+	return
+}
+
 //----------------------------------------------------------------------------------------------------------------------------//
 
 func (c *Chains) Prepare() (err error) {
@@ -115,7 +143,7 @@ func (c *Chains) Prepare() (err error) {
 
 	msgs := misc.NewMessages()
 
-	c.knownVars = make(misc.BoolMap, 16)
+	c.knownVars = make(map[string]reflect.Kind, 16)
 
 	for ci, chain := range c.Chains {
 		if len(chain.List) == 0 {
@@ -129,7 +157,12 @@ func (c *Chains) Prepare() (err error) {
 				continue
 			}
 
-			c.knownVars[token.VarName] = true
+			k := reflect.ValueOf(token.ValPattern).Kind()
+			if kk, exists := c.knownVars[token.VarName]; exists && kk != k {
+				msgs.Add(`[%d.%d] variable "%s" defined as %s and %s in different chains`, ci, ti, token.VarName, k, kk)
+				continue
+			}
+			c.knownVars[token.VarName] = k
 
 			if token.Expr == "" && len(chain.List) > 1 {
 				msgs.Add("[%d.%d] an empty expression is allowed only in a chain of one element", ci, ti)
@@ -270,6 +303,38 @@ func (c *Chains) Less(i, j int) bool {
 
 func (c *Chains) Swap(i, j int) {
 	c.Chains[i], c.Chains[j] = c.Chains[j], c.Chains[i]
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func (vars Vars) Int(name string) (v int64, err error) {
+	x, exists := vars[name]
+	if !exists {
+		err = fmt.Errorf(`unknown variable "%s"`, name)
+		return
+	}
+
+	return misc.Iface2Int(x)
+}
+
+func (vars Vars) Uint(name string) (v uint64, err error) {
+	x, exists := vars[name]
+	if !exists {
+		err = fmt.Errorf(`unknown variable "%s"`, name)
+		return
+	}
+
+	return misc.Iface2Uint(x)
+}
+
+func (vars Vars) String(name string) (v string, err error) {
+	x, exists := vars[name]
+	if !exists {
+		err = fmt.Errorf(`unknown variable "%s"`, name)
+		return
+	}
+
+	return misc.Iface2String(x)
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//
