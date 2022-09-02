@@ -9,8 +9,8 @@ github.com/alrusov/loadavg v0.1.4/go.mod h1:7mpPkY2wHDZbMBbsMC3S9zAicM1PFMnT3dMk
 github.com/alrusov/log v0.1.32 h1:9fTtwk2o4AQHfKO8erwbmuFAVl6n/+I98i8zrAlx4dU=
 github.com/alrusov/log v0.1.32/go.mod h1:oQh1gXfxlDfI+MWAigQQzCu/O9wv6mM59JXqWfj5mMc=
 github.com/alrusov/misc v0.1.45/go.mod h1:9n/TPhEOs7n3zEKP8R/TK0TIOJGISHOJe5KwKqsCsgg=
-github.com/alrusov/misc v0.1.59 h1:YWnSws6PtcQ0AV/fIEbvwQFKseaETJKmTUXOBmPJu9Q=
-github.com/alrusov/misc v0.1.59/go.mod h1:vywA6CgYL87p+qxLP+FDuSRrNL6ZvJ0r+uDixw9rcmk=
+github.com/alrusov/misc v0.1.61 h1:M+WChYmTQ7cg7fz3l2rqFWJEd9IpWNv3eEADa9gJrRw=
+github.com/alrusov/misc v0.1.61/go.mod h1:vywA6CgYL87p+qxLP+FDuSRrNL6ZvJ0r+uDixw9rcmk=
 github.com/alrusov/panic v0.1.14 h1:h3DU1GVIp1ab3PPMAOweyWMPILWyLR8EZnjPIx9SUfo=
 github.com/alrusov/panic v0.1.14/go.mod h1:ALoONDJK6XEbMvLnsenCkVSF1LXQ/gjU7uXi0JX7bak=
 github.com/alrusov/stdhttp v0.1.105 h1:NCYqb0+5qz7Pc8vW9F9ZKCmNzSgJZBYvFmeab7TK8g0=

@@ -15,6 +15,7 @@ type (
 	ChainSet struct {
 		Description string `json:"description"`
 		Set         Map    `json:"set"`
+		Flags       uint64 `json:"-"`
 	}
 
 	Map map[For]*Chains
@@ -25,6 +26,7 @@ type (
 		Description string `json:"description"`
 		prepared    bool
 		Chains      []Chain `json:"chains"`
+		Flags       uint64  `json:"-"`
 		knownVars   map[string]reflect.Kind
 	}
 
@@ -33,12 +35,14 @@ type (
 		Name        string  `json:"name"`
 		Scope       string  `json:"scope,omitempty"`
 		List        []Token `json:"list"`
+		Flags       uint64  `json:"-"`
 	}
 
 	Token struct {
 		Expr       string      `json:"expr"`
 		VarName    string      `json:"varName"`
 		ValPattern interface{} `json:"varPattern"`
+		Flags      uint64      `json:"-"`
 		re         *regexp.Regexp
 	}
 
@@ -86,7 +90,7 @@ func (cs *ChainSet) Prepare() (err error) {
 
 func (cs *ChainSet) Do(f For, path []string, vars Vars) (matched *Chain, result interface{}, err error) {
 	c, exists := cs.Set[f]
-	if !exists {
+	if !exists || len(c.Chains) == 0 {
 		return
 	}
 
@@ -110,7 +114,7 @@ func (cs *ChainSet) Do(f For, path []string, vars Vars) (matched *Chain, result 
 
 func (cs *ChainSet) Do2(f For, path []string) (matched *Chain, result interface{}, vars Vars, err error) {
 	c, exists := cs.Set[f]
-	if !exists {
+	if !exists || len(c.Chains) == 0 {
 		return
 	}
 
