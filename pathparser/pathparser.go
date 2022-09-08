@@ -2,6 +2,7 @@ package pathparser
 
 import (
 	"fmt"
+	"net/http"
 	"reflect"
 	"regexp"
 	"sort"
@@ -79,9 +80,15 @@ func (cs *ChainSet) Prepare() (err error) {
 	msgs := misc.NewMessages()
 
 	for f, c := range cs.Set {
+		if len(c.Chains) == 0 {
+			delete(cs.Set, f)
+			continue
+		}
+
 		err := c.Prepare()
 		if err != nil {
 			msgs.Add(`%s: %s`, f.Name(), err)
+			continue
 		}
 	}
 
@@ -89,8 +96,14 @@ func (cs *ChainSet) Prepare() (err error) {
 }
 
 func (cs *ChainSet) Do(f For, path []string, vars Vars) (matched *Chain, result interface{}, err error) {
+	matched, result, _, err = cs.DoEx(f, path, vars)
+	return
+}
+
+func (cs *ChainSet) DoEx(f For, path []string, vars Vars) (matched *Chain, result interface{}, code int, err error) {
 	c, exists := cs.Set[f]
 	if !exists || len(c.Chains) == 0 {
+		code = http.StatusMethodNotAllowed
 		return
 	}
 
@@ -103,18 +116,20 @@ func (cs *ChainSet) Do(f For, path []string, vars Vars) (matched *Chain, result 
 				list[f.Name()] = c
 			}
 
+			code = http.StatusOK
 			result = list
 			return
 		}
 	}
 
-	matched, err = c.Do(path, vars)
+	matched, code, err = c.DoEx(path, vars)
 	return
 }
 
-func (cs *ChainSet) Do2(f For, path []string) (matched *Chain, result interface{}, vars Vars, err error) {
+func (cs *ChainSet) DoWithAutoVars(f For, path []string) (matched *Chain, result interface{}, code int, vars Vars, err error) {
 	c, exists := cs.Set[f]
 	if !exists || len(c.Chains) == 0 {
+		code = http.StatusMethodNotAllowed
 		return
 	}
 
@@ -133,8 +148,7 @@ func (cs *ChainSet) Do2(f For, path []string) (matched *Chain, result interface{
 		}
 	}
 
-	matched, result, err = cs.Do(f, path, vars)
-
+	matched, result, code, err = cs.DoEx(f, path, vars)
 	return
 }
 
@@ -198,8 +212,16 @@ func (c *Chains) Prepare() (err error) {
 //----------------------------------------------------------------------------------------------------------------------------//
 
 func (c *Chains) Do(path []string, vars Vars) (matched *Chain, err error) {
+	matched, _, err = c.DoEx(path, vars)
+	return
+}
+
+func (c *Chains) DoEx(path []string, vars Vars) (matched *Chain, code int, err error) {
+	code = 0
+
 	if !c.prepared {
 		err = fmt.Errorf("not prepared")
+		code = http.StatusInternalServerError
 		return
 	}
 
@@ -224,6 +246,7 @@ func (c *Chains) Do(path []string, vars Vars) (matched *Chain, err error) {
 
 	err = msgs.Error()
 	if err != nil {
+		code = http.StatusInternalServerError
 		return
 	}
 
@@ -231,7 +254,7 @@ func (c *Chains) Do(path []string, vars Vars) (matched *Chain, err error) {
 
 	if ln == 0 &&
 		len(c.Chains[0].List) == 1 && c.Chains[0].List[0].Expr == "" {
-		// Пустой путь
+		// empty path -- OK
 		matched = &c.Chains[0]
 		return
 	}
@@ -244,7 +267,7 @@ func (c *Chains) Do(path []string, vars Vars) (matched *Chain, err error) {
 		}
 
 		if len(chain.List) > ln {
-			// Не найдено
+			code = http.StatusNotFound
 			return
 		}
 
@@ -262,7 +285,7 @@ func (c *Chains) Do(path []string, vars Vars) (matched *Chain, err error) {
 	}
 
 	if matched == nil {
-		// Не найдено
+		code = http.StatusNotFound
 		return
 	}
 
@@ -275,6 +298,7 @@ func (c *Chains) Do(path []string, vars Vars) (matched *Chain, err error) {
 
 	err = msgs.Error()
 	if err != nil {
+		code = http.StatusNotFound
 		matched = nil
 		return
 	}

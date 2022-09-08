@@ -41,6 +41,7 @@ type (
 		endpoint      Endpoint
 		useHashForGet bool
 	}
+
 	// Flags --
 	UseHashForGet bool
 
@@ -69,6 +70,8 @@ var (
 func RegisterEndpoint(url string, endpoint Endpoint, options ...interface{}) (err error) {
 	mutex.Lock()
 	defer mutex.Unlock()
+
+	url = misc.NormalizeSlashes(url)
 
 	_, exists := endpoints[url]
 	if exists {
@@ -162,21 +165,17 @@ func Handler(id uint64, prefix string, path string, w http.ResponseWriter, r *ht
 
 	code := 0
 	var data interface{}
-	var objectID interface{}
+	//var objectID interface{}
 
 	withHash := false
 	hash := ""
 
 	switch r.Method {
 	case stdhttp.MethodPOST:
-		if len(params.ExtraPath) != 0 {
-			data, code, err = NotFound(params)
-		} else {
-			data, code, err = df.endpoint.Create(params)
-			if err == nil && code == http.StatusCreated && objectID != nil {
-				headers["Location"] = fmt.Sprintf("%s/%v", params.Base, objectID)
-			}
-		}
+		data, code, err = df.endpoint.Create(params)
+		//if err == nil && code == http.StatusCreated && objectID != nil {
+		//	headers["Location"] = fmt.Sprintf("%s/%v", params.Base, objectID)
+		//}
 
 	case stdhttp.MethodGET:
 		data, code, err = df.endpoint.Get(params)
@@ -186,39 +185,42 @@ func Handler(id uint64, prefix string, path string, w http.ResponseWriter, r *ht
 		}
 
 	case stdhttp.MethodPUT:
-		if len(params.ExtraPath) == 0 {
-			data, code, err = NotAllowed(params)
-		} else {
-			data, code, err = df.endpoint.Replace(params)
-		}
+		data, code, err = df.endpoint.Replace(params)
 
 	case stdhttp.MethodPATCH:
-		if len(params.ExtraPath) == 0 {
-			data, code, err = NotAllowed(params)
-		} else {
-			data, code, err = df.endpoint.Modify(params)
-		}
+		data, code, err = df.endpoint.Modify(params)
 
 	case stdhttp.MethodDELETE:
-		if len(params.ExtraPath) == 0 {
-			data, code, err = NotAllowed(params)
-		} else {
-			data, code, err = df.endpoint.Delete(params)
-		}
+		data, code, err = df.endpoint.Delete(params)
 
 	default:
 		data, code, err = NotAllowed(params)
 	}
 
-	if code < 0 {
-		code = -code
-	} else if code == 0 {
+	switch code {
+	default:
+		if code < 0 {
+			code = -code
+		}
+	case 0:
 		if err != nil {
 			code = http.StatusInternalServerError
 		} else if data == nil {
 			code = http.StatusNoContent
 		} else {
 			code = http.StatusOK
+		}
+	case http.StatusNotImplemented:
+		if err == nil {
+			data, code, err = NotImplemented(params)
+		}
+	case http.StatusMethodNotAllowed:
+		if err == nil {
+			data, code, err = NotAllowed(params)
+		}
+	case http.StatusNotFound:
+		if err == nil {
+			data, code, err = NotFound(params)
 		}
 	}
 
@@ -253,19 +255,19 @@ func Handler(id uint64, prefix string, path string, w http.ResponseWriter, r *ht
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-// NotFound --
-func NotFound(params *Params) (data interface{}, code int, err error) {
-	return nil, http.StatusNotFound, fmt.Errorf(`method "%s" is not found for this case`, params.R.Method)
-}
-
 // NotImplemented --
 func NotImplemented(params *Params) (data interface{}, code int, err error) {
-	return nil, http.StatusNotImplemented, fmt.Errorf(`method "%s" is not implemented for this case`, params.R.Method)
+	return nil, http.StatusNotImplemented, fmt.Errorf(`method "%s" is not implemented`, params.R.Method)
 }
 
 // NotAllowed --
 func NotAllowed(params *Params) (data interface{}, code int, err error) {
-	return nil, http.StatusMethodNotAllowed, fmt.Errorf(`method "%s" is not allowed for this case`, params.R.Method)
+	return nil, http.StatusMethodNotAllowed, fmt.Errorf(`method "%s" is not allowed`, params.R.Method)
+}
+
+// NotFound --
+func NotFound(params *Params) (data interface{}, code int, err error) {
+	return nil, http.StatusNotFound, fmt.Errorf(`%s not found or method %s is not applicable for this path`, params.R.URL.Path, params.R.Method)
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//
