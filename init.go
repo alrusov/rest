@@ -1,7 +1,7 @@
 /*
 Описание структур для API и инициализация
 */
-package api
+package rest
 
 import (
 	"fmt"

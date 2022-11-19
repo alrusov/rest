@@ -1,7 +1,7 @@
 /*
 Описание структур для API и инициализация
 */
-package api
+package rest
 
 import (
 	"database/sql"
@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	stdconfig "github.com/alrusov/config"
+	"github.com/alrusov/config"
 	"github.com/alrusov/log"
 	"github.com/alrusov/misc"
 	"github.com/alrusov/rest/path"
@@ -163,7 +163,7 @@ const (
 	ExecResultName = "execResult"
 
 	DefaultMaxCount  = 10000
-	DefaultMaxPeriod = stdconfig.Duration(3600 * time.Second)
+	DefaultMaxPeriod = config.Duration(3600 * time.Second)
 )
 
 //----------------------------------------------------------------------------------------------------------------------------//

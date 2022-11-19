@@ -1,7 +1,7 @@
 /*
 Обработка прикладных HTTP запросов
 */
-package api
+package rest
 
 import (
 	"fmt"
