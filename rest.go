@@ -1,17 +1,16 @@
-package rest
+package api
 
 import (
-	"bytes"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
-	"sync"
 
+	"github.com/alrusov/db"
 	"github.com/alrusov/misc"
 	"github.com/alrusov/stdhttp"
+	"github.com/alrusov/rest/path"
 )
-
-//----------------------------------------------------------------------------------------------------------------------------//
 
 /*
 Recommended behavior
@@ -27,247 +26,388 @@ Recommended behavior
 +--------+----------------+------------------------------------------------------------------------------------------------------+----------------------------------------------------------------------------+
 */
 
-type (
-	// Endpoint --
-	Endpoint interface {
-		Create(params *Params) (data interface{}, code int, err error)
-		Get(params *Params) (data interface{}, code int, err error)
-		Replace(params *Params) (data interface{}, code int, err error)
-		Modify(params *Params) (data interface{}, code int, err error)
-		Delete(params *Params) (data interface{}, code int, err error)
-	}
-
-	endpointDef struct {
-		endpoint      Endpoint
-		useHashForGet bool
-	}
-
-	// Flags --
-	UseHashForGet bool
-
-	// Params --
-	Params struct {
-		ID        uint64              `json:"id"`
-		Prefix    string              `json:"prefix"`
-		Path      string              `json:"path"`
-		W         http.ResponseWriter `json:"-"`
-		R         *http.Request       `json:"-"`
-		Base      string              `json:"base"`
-		ExtraPath []string            `json:"extraPath"`
-		Body      []byte              `json:"body"`
-		df        *endpointDef
-	}
-)
-
-var (
-	mutex     = new(sync.RWMutex)
-	endpoints = make(map[string]*endpointDef)
-)
-
 //----------------------------------------------------------------------------------------------------------------------------//
 
-// RegisterEndpoint --
-func RegisterEndpoint(url string, endpoint Endpoint, options ...interface{}) (err error) {
-	mutex.Lock()
-	defer mutex.Unlock()
-
-	url = misc.NormalizeSlashes(url)
-
-	_, exists := endpoints[url]
-	if exists {
-		err = fmt.Errorf(`"%s" is already defined`, url)
-		return
-	}
-
-	df := &endpointDef{
-		endpoint: endpoint,
-	}
-
-	for _, opt := range options {
-		switch opt := opt.(type) {
-		case UseHashForGet:
-			df.useHashForGet = bool(opt)
-		}
-	}
-
-	endpoints[url] = df
-	return
-}
-
-//----------------------------------------------------------------------------------------------------------------------------//
-
-// Handler --
-func Handler(id uint64, prefix string, path string, w http.ResponseWriter, r *http.Request) (processed bool) {
-	processed = false
-
-	path = misc.NormalizeSlashes(path)
-	var df *endpointDef
-
-	mutex.RLock()
-
-	base := path
-	for {
-		e, exists := endpoints[base]
-		if exists {
-			df = e
-			break
-		}
-
-		idx := strings.LastIndex(base, "/")
-		if idx <= 0 {
-			break
-		}
-
-		base = base[:idx]
-	}
-
-	mutex.RUnlock()
-
-	if df == nil {
-		return
-	}
-
-	var err error
-
-	processed = true
-
-	var body []byte
-
-	if r.Body != nil {
-		var bodyBuf *bytes.Buffer
-		bodyBuf, _, err = stdhttp.ReadData(r.Header, r.Body)
-		if err != nil {
-			stdhttp.Error(id, false, w, r, http.StatusInternalServerError, err.Error(), nil)
-			return
-		}
-		r.Body.Close()
-		body = bodyBuf.Bytes()
-	}
-
-	extraPath := strings.Split(strings.Trim(path[len(base):], "/"), "/")
-	if len(extraPath) == 1 && extraPath[0] == "" {
-		extraPath = []string{}
-	}
-
-	params := &Params{
-		ID:        id,
-		Prefix:    prefix,
-		Path:      path,
-		W:         w,
-		R:         r,
-		Base:      base,
-		ExtraPath: extraPath,
-		Body:      body,
-		df:        df,
-	}
-
-	headers := make(misc.StringMap, 2)
-
-	code := 0
-	var data interface{}
-	//var objectID interface{}
-
-	withHash := false
-	hash := ""
-
-	switch r.Method {
-	case stdhttp.MethodPOST:
-		data, code, err = df.endpoint.Create(params)
-		//if err == nil && code == http.StatusCreated && objectID != nil {
-		//	headers["Location"] = fmt.Sprintf("%s/%v", params.Base, objectID)
-		//}
+// Точка входа
+func (proc *ProcOptions) rest() (headers misc.StringMap, result any, code int, err error) {
+	switch proc.R.Method {
+	default:
+		return proc.Others()
 
 	case stdhttp.MethodGET:
-		data, code, err = df.endpoint.Get(params)
-		withHash = df.useHashForGet
-		if withHash {
-			hash = r.URL.Query().Get("hash")
-		}
+		return proc.Get()
+
+	case stdhttp.MethodPOST:
+		return proc.Create()
 
 	case stdhttp.MethodPUT:
-		data, code, err = df.endpoint.Replace(params)
+		return proc.Update()
 
 	case stdhttp.MethodPATCH:
-		data, code, err = df.endpoint.Modify(params)
+		return proc.Update()
 
 	case stdhttp.MethodDELETE:
-		data, code, err = df.endpoint.Delete(params)
-
-	default:
-		data, code, err = NotAllowed(params)
+		return proc.Delete()
 	}
+}
 
-	switch code {
-	default:
-		if code < 0 {
-			code = -code
-		}
-	case 0:
-		if err != nil {
-			code = http.StatusInternalServerError
-		} else if data == nil {
-			code = http.StatusNoContent
-		} else {
-			code = http.StatusOK
-		}
-	case http.StatusNotImplemented:
-		if err == nil {
-			data, code, err = NotImplemented(params)
-		}
-	case http.StatusMethodNotAllowed:
-		if err == nil {
-			data, code, err = NotAllowed(params)
-		}
-	case http.StatusNotFound:
-		if err == nil {
-			data, code, err = NotFound(params)
-		}
+//----------------------------------------------------------------------------------------------------------------------------//
+
+// Get -- получить данные
+func (proc *ProcOptions) Get() (headers misc.StringMap, result any, code int, err error) {
+	srcTp := proc.Chain.Parent.SrcResponseType
+	if srcTp == nil {
+		srcTp = proc.Chain.Parent.ResponseType
 	}
+	proc.DBqueryResult = reflect.New(reflect.MakeSlice(reflect.SliceOf(srcTp), 0, 0).Type()).Interface()
 
+	result, code, err = proc.before()
 	if err != nil {
-		stdhttp.Error(id, false, w, r, code, err.Error(), nil)
+		if code == 0 {
+			code = http.StatusBadRequest
+		}
+		return
+	}
+	if code != 0 || result != nil {
 		return
 	}
 
-	var jData []byte
-	contentType := stdhttp.ContentTypeJSON
-
-	if code == http.StatusNoContent {
-		// nothing to do
-		contentType = stdhttp.ContentTypeText
-	} else if data == nil {
-		jData = []byte("{}")
-	} else {
-		code2 := code
-		jData, code2, headers, err = stdhttp.JSONResultWithDataHash(data, withHash && code/100 == 2, hash, headers)
-		if code2 != http.StatusOK {
-			code = code2
-		}
-		if err != nil {
-			stdhttp.Error(id, false, w, r, code, err.Error(), nil)
-			return
-		}
+	err = db.Query(proc.Info.DBtype, proc.Info.DBidx, proc.DBqueryResult, proc.DBqueryName, proc.Chain.Parent.DBFields, proc.DBqueryVars)
+	if err != nil {
+		code = http.StatusInternalServerError
+		return
 	}
 
-	stdhttp.WriteReply(w, r, code, contentType, headers, jData)
+	result, code, err = proc.after()
+	if err != nil {
+		if code == 0 {
+			code = http.StatusBadRequest
+		}
+		return
+	}
+	if code != 0 || result != nil {
+		return
+	}
+
+	if proc.Chain.Parent.Flags&path.FlagResponseIsNotArray != 0 {
+		v := reflect.ValueOf(proc.DBqueryResult).Elem()
+		if v.Len() == 0 {
+			code = http.StatusNoContent
+			return
+		} else {
+			result = v.Index(0).Interface()
+		}
+	} else {
+		result = proc.DBqueryResult
+	}
+
 	return
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-// NotImplemented --
-func NotImplemented(params *Params) (data interface{}, code int, err error) {
-	return nil, http.StatusNotImplemented, fmt.Errorf(`method "%s" is not implemented`, params.R.Method)
+// Create -- создать
+func (proc *ProcOptions) Create() (headers misc.StringMap, result any, code int, err error) {
+	return proc.save(false)
 }
 
-// NotAllowed --
-func NotAllowed(params *Params) (data interface{}, code int, err error) {
-	return nil, http.StatusMethodNotAllowed, fmt.Errorf(`method "%s" is not allowed`, params.R.Method)
+// Update -- изменить
+func (proc *ProcOptions) Update() (headers misc.StringMap, result any, code int, err error) {
+	return proc.save(true)
 }
 
-// NotFound --
-func NotFound(params *Params) (data interface{}, code int, err error) {
-	return nil, http.StatusNotFound, fmt.Errorf(`%s not found or method %s is not applicable for this path`, params.R.URL.Path, params.R.Method)
+func (proc *ProcOptions) save(forUpdate bool) (headers misc.StringMap, result any, code int, err error) {
+	result, code, err = proc.before()
+	if err != nil {
+		if code == 0 {
+			code = http.StatusBadRequest
+		}
+		return
+	}
+	if code != 0 || result != nil {
+		return
+	}
+
+	res := &ExecResult{}
+	defer func() {
+		res.Notice = proc.Notices.String()
+	}()
+
+	if proc.Fields == nil && proc.Chain.Parent.Flags&path.FlagRequestDontMakeFlatModel == 0 {
+		var notice error
+
+		proc.Fields, notice, err = proc.Chain.Parent.ExtractFieldsFromBody(proc.RawBody)
+		if err != nil {
+			return
+		}
+
+		if notice != nil {
+			proc.Notices.AddError(notice)
+		}
+	}
+
+	if forUpdate {
+		for i, f := range proc.Chain.Parent.RequestUniqueKeyFields {
+			if _, exists := proc.Fields[f]; exists {
+				delete(proc.Fields, f)
+				tp := ""
+				if i == 0 {
+					tp = "primary "
+				}
+				proc.Notices.Add(`%skey field "%s" ignored`, tp, f)
+			}
+		}
+	}
+
+	if len(proc.Fields) == 0 {
+		proc.Notices.Add("no fields")
+		result = res
+		return
+	}
+
+	proc.RequestBodyNames = make([]string, 0, len(proc.Fields))
+	proc.RequestBodyVals = make([]any, 0, len(proc.Fields))
+	for n, v := range proc.Fields {
+		proc.RequestBodyNames = append(proc.RequestBodyNames, n)
+		proc.RequestBodyVals = append(proc.RequestBodyVals, v)
+	}
+
+	startIdx := len(proc.DBqueryVars) + 1
+	proc.DBqueryVars = append(proc.DBqueryVars, proc.RequestBodyVals...)
+
+	patternType := db.PatternTypeInsert
+	if forUpdate {
+		patternType = db.PatternTypeUpdate
+	}
+
+	proc.ExecResult, err = db.ExecEx(proc.Info.DBtype, proc.Info.DBidx, proc.DBqueryName, patternType, startIdx, proc.RequestBodyNames, proc.DBqueryVars)
+	if err != nil {
+		code = http.StatusInternalServerError
+		return
+	}
+
+	result, code, err = proc.after()
+	if err != nil {
+		if code == 0 {
+			code = http.StatusBadRequest
+		}
+		return
+	}
+	if code != 0 || result != nil {
+		return
+	}
+
+	res.AffectedRows, _ = proc.ExecResult.RowsAffected()
+	result = res
+
+	return
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+// Delete -- удалить
+func (proc *ProcOptions) Delete() (headers misc.StringMap, result any, code int, err error) {
+	result, code, err = proc.before()
+	if err != nil {
+		if code == 0 {
+			code = http.StatusBadRequest
+		}
+		return
+	}
+	if code != 0 || result != nil {
+		return
+	}
+
+	proc.ExecResult, err = db.Exec(proc.Info.DBtype, proc.Info.DBidx, proc.DBqueryName, proc.DBqueryVars)
+	if err != nil {
+		code = http.StatusInternalServerError
+		return
+	}
+
+	result, code, err = proc.after()
+	if err != nil {
+		if code == 0 {
+			code = http.StatusBadRequest
+		}
+		return
+	}
+	if code != 0 || result != nil {
+		return
+	}
+
+	n, _ := proc.ExecResult.RowsAffected()
+	result = ExecResult{
+		AffectedRows: n,
+	}
+
+	return
+}
+
+// ----------------------------------------------------------------------------------------------------------------------------//
+
+// Other -- другой запрос
+func (proc *ProcOptions) Others() (headers misc.StringMap, result any, code int, err error) {
+	result, code, err = proc.before()
+	if err != nil {
+		if code == 0 {
+			code = http.StatusBadRequest
+		}
+		return
+	}
+	if code != 0 || result != nil {
+		return
+	}
+
+	result, code, err = proc.after()
+	if err != nil {
+		if code == 0 {
+			code = http.StatusBadRequest
+		}
+		return
+	}
+	if code != 0 || result != nil {
+		return
+	}
+
+	code, err = NotAllowed("")
+
+	return
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func (info *Info) makeParamsDescription() (err error) {
+	if info.Description != "" {
+		return
+	}
+
+	stdDescr := "см. ./.info"
+
+	for method, mDef := range info.Methods.Methods {
+		var d []string
+
+		t := mDef.QueryParamsType
+		if t != nil {
+			if t.Kind() == reflect.Pointer {
+				t = t.Elem()
+			}
+
+			if t.Kind() != reflect.Struct {
+				err = fmt.Errorf("GetParam[%s] is not to a struct (%s)", method, t)
+				return
+			}
+
+			ln := t.NumField()
+			d = make([]string, 0, ln)
+
+			for i := 0; i < ln; i++ {
+				fieldT := t.Field(i)
+
+				name := misc.StructFieldName(&fieldT, path.TagJSON)
+				if name == "-" {
+					continue
+				}
+
+				sample, defExists := fieldT.Tag.Lookup(path.TagDefault)
+				if !defExists || sample == "" {
+					defExists = false
+					sample = fieldT.Tag.Get(path.TagSample)
+				}
+
+				eq := ""
+
+				if fieldT.Type.Kind() != reflect.Bool {
+					if sample != "" {
+						if !defExists {
+							sample = "<" + sample + ">"
+						}
+					} else {
+						sample = "<" + name + ">"
+					}
+				}
+
+				if sample != "" {
+					eq = "="
+				}
+
+				required := fieldT.Tag.Get(path.TagRequired)
+				op := ""
+				cp := ""
+				if required != "true" {
+					op = "["
+					cp = "]"
+				}
+
+				d = append(d, fmt.Sprintf("%s%s%s%s%s", op, name, eq, sample, cp))
+			}
+		}
+
+		if len(d) == 0 {
+			d = []string{"-"}
+		}
+
+		mDef.Description = fmt.Sprintf("%s. Параметры: %s", mDef.Description, strings.Join(append(d, stdDescr), ", "))
+	}
+
+	return
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func (proc *ProcOptions) before() (result any, code int, err error) {
+	if proc.Info.Before != nil {
+		result, code, err = proc.Info.Before(proc)
+		if err != nil {
+			if code == 0 {
+				code = http.StatusBadRequest
+			}
+			return
+		}
+		if code != 0 || result != nil {
+			return
+		}
+	}
+
+	result, code, err = proc.handler.Before(proc)
+	if err != nil {
+		if code == 0 {
+			code = http.StatusBadRequest
+		}
+		return
+	}
+	if code != 0 || result != nil {
+		return
+	}
+
+	return
+}
+
+func (proc *ProcOptions) after() (result any, code int, err error) {
+	result, code, err = proc.handler.After(proc)
+	if err != nil {
+		if code == 0 {
+			code = http.StatusBadRequest
+		}
+		return
+	}
+	if code != 0 || result != nil {
+		return
+	}
+
+	if proc.Info.After != nil {
+		result, code, err = proc.Info.After(proc)
+		if err != nil {
+			if code == 0 {
+				code = http.StatusBadRequest
+			}
+			return
+		}
+		if code != 0 || result != nil {
+			return
+		}
+	}
+
+	return
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//
