@@ -15,7 +15,7 @@ import (
 	"github.com/alrusov/jsonw"
 	"github.com/alrusov/log"
 	"github.com/alrusov/misc"
-	"github.com/alrusov/rest/path"
+	path "github.com/alrusov/rest/v2/path"
 	"github.com/alrusov/stdhttp"
 )
 

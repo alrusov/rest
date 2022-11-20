@@ -9,7 +9,7 @@ import (
 	"github.com/alrusov/db"
 	"github.com/alrusov/misc"
 	"github.com/alrusov/stdhttp"
-	"github.com/alrusov/rest/path"
+	path "github.com/alrusov/rest/v2/path"
 )
 
 /*
