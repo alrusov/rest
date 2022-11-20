@@ -3,20 +3,20 @@ module github.com/alrusov/rest/v2
 go 1.19
 
 require (
-	github.com/alrusov/config v0.1.46
-	github.com/alrusov/db v0.0.0-20221119162515-9281744a1333
-	github.com/alrusov/jsonw v0.1.2
-	github.com/alrusov/log v0.1.32
-	github.com/alrusov/misc v0.1.64
-	github.com/alrusov/stdhttp v0.1.105
+	github.com/alrusov/config v0.1.47
+	github.com/alrusov/db v0.1.0
+	github.com/alrusov/jsonw v0.1.3
+	github.com/alrusov/log v0.1.33
+	github.com/alrusov/misc v1.0.65
+	github.com/alrusov/stdhttp v0.1.106
 	github.com/getkin/kin-openapi v0.108.0
 )
 
 require (
-	github.com/alrusov/auth v0.1.1 // indirect
-	github.com/alrusov/initializer v0.1.0 // indirect
-	github.com/alrusov/loadavg v0.1.4 // indirect
-	github.com/alrusov/panic v0.1.14 // indirect
+	github.com/alrusov/auth v0.1.2 // indirect
+	github.com/alrusov/initializer v0.1.1 // indirect
+	github.com/alrusov/loadavg v0.1.5 // indirect
+	github.com/alrusov/panic v0.1.15 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/swag v0.19.5 // indirect
 	github.com/invopop/yaml v0.1.0 // indirect
