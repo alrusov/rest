@@ -1,7 +1,7 @@
 github.com/alrusov/auth v0.1.2 h1:OcToPW9AAfYff9lPAq3fjsSxqy/hYd1X0mLYlDakSxU=
 github.com/alrusov/auth v0.1.2/go.mod h1:nU7Gg2Pys3oq0peMzkOTot2Hr6MD6K4mutyVwAZGqdc=
-github.com/alrusov/config v0.1.47 h1:NNiD5J8JrhBzrTCEBax74QzfYNTv1UWak+AoRKGpFho=
-github.com/alrusov/config v0.1.47/go.mod h1:qE954mtx4ptjjqPtxWxpEywvaKMBlt8PboV4SIoOrE0=
+github.com/alrusov/config v0.1.48 h1:/wHKV5oEEKhflgrU5fZxpiUjNSa2LCZNsQE6ukCz4Y0=
+github.com/alrusov/config v0.1.48/go.mod h1:G7EHrnGcIER0N2f/S5msqQpSyEQur8ubTOXFN8+4efQ=
 github.com/alrusov/db v0.1.0 h1:xoBSO7NJVM1TT4+xeBByOX3auNgWcnL8dM2lNkUiUgs=
 github.com/alrusov/db v0.1.0/go.mod h1:SPPNAjBoBV6cVPPGXI/yP3ndi4EBiuQgu+Wp+mVFxsA=
 github.com/alrusov/initializer v0.1.1 h1:PjbBZ3cmZysPBGmAp8OHcYnn1aHQQgVKJAXiK2rXn2I=
@@ -21,8 +21,8 @@ github.com/alrusov/stdhttp v0.1.106/go.mod h1:f7sH+KGcTIDQ84MsGEMu/NKcWcMfJTMcFk
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/getkin/kin-openapi v0.108.0 h1:EYf0GtsKa4hQNIlplGS+Au7NEfGQ1F7MoHD2kcVevPQ=
-github.com/getkin/kin-openapi v0.108.0/go.mod h1:QtwUNt0PAAgIIBEvFWYfB7dfngxtAaqCX1zYHMZDeK8=
+github.com/getkin/kin-openapi v0.109.0 h1:Cpb0PmIPFEV0LVvikEvfo3gw3rBMVSjJ57w15j+/A/U=
+github.com/getkin/kin-openapi v0.109.0/go.mod h1:QtwUNt0PAAgIIBEvFWYfB7dfngxtAaqCX1zYHMZDeK8=
 github.com/go-openapi/jsonpointer v0.19.5 h1:gZr+CIYByUqjcgeLXnQu2gHYQC9o73G2XUeOFYEICuY=
 github.com/go-openapi/jsonpointer v0.19.5/go.mod h1:Pl9vOtqEWErmShwVjC8pYs9cog34VGT37dQOVbmoatg=
 github.com/go-openapi/swag v0.19.5 h1:lTz6Ys4CmqqCQmZPBlbQENR1/GucA2bzYTE12Pw4tFY=

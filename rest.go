@@ -7,9 +7,10 @@ import (
 	"strings"
 
 	"github.com/alrusov/db"
+	"github.com/alrusov/log"
 	"github.com/alrusov/misc"
-	"github.com/alrusov/stdhttp"
 	path "github.com/alrusov/rest/v2/path"
+	"github.com/alrusov/stdhttp"
 )
 
 /*
@@ -197,7 +198,22 @@ func (proc *ProcOptions) save(forUpdate bool) (headers misc.StringMap, result an
 		return
 	}
 
-	res.AffectedRows, _ = proc.ExecResult.RowsAffected()
+	var err2 error
+
+	res.AffectedRows, err2 = proc.ExecResult.RowsAffected()
+	if err2 != nil {
+		Log.Message(log.NOTICE, "[%d] RowsAffected: %s", proc.ID, err)
+	}
+
+	if !forUpdate {
+		lastID, _ := proc.ExecResult.LastInsertId()
+		if err2 != nil {
+			Log.Message(log.NOTICE, "[%d] LastInsertId: %s", proc.ID, err)
+		} else {
+			res.ID = uint64(lastID)
+		}
+	}
+
 	result = res
 
 	return
