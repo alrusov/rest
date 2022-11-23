@@ -181,7 +181,19 @@ func (proc *ProcOptions) save(forUpdate bool) (headers misc.StringMap, result an
 		patternType = db.PatternTypeUpdate
 	}
 
-	proc.ExecResult, err = db.ExecEx(proc.Info.DBtype, proc.Info.DBidx, proc.DBqueryName, patternType, startIdx, proc.RequestBodyNames, proc.DBqueryVars)
+	type destType []struct {
+		ID uint64 `db:"id"`
+	}
+
+	var dest *destType
+
+	if !forUpdate && proc.Chain.Parent.Flags&path.FlagCreateReturnsObject != 0 {
+		var destVal destType
+		dest = &destVal
+	}
+
+	proc.ExecResult, err = db.ExecEx(proc.Info.DBtype, proc.Info.DBidx, dest, proc.DBqueryName, patternType, startIdx, proc.RequestBodyNames, proc.DBqueryVars)
+
 	if err != nil {
 		code = http.StatusInternalServerError
 		return
@@ -198,19 +210,26 @@ func (proc *ProcOptions) save(forUpdate bool) (headers misc.StringMap, result an
 		return
 	}
 
-	var err2 error
-
-	res.AffectedRows, err2 = proc.ExecResult.RowsAffected()
-	if err2 != nil {
-		Log.Message(log.NOTICE, "[%d] RowsAffected: %s", proc.ID, err)
-	}
-
-	if !forUpdate {
-		lastID, _ := proc.ExecResult.LastInsertId()
-		if err2 != nil {
-			Log.Message(log.NOTICE, "[%d] LastInsertId: %s", proc.ID, err)
+	if dest == nil {
+		n, err := proc.ExecResult.RowsAffected()
+		if err != nil {
+			Log.Message(log.NOTICE, "[%d] RowsAffected: %s", proc.ID, err)
 		} else {
-			res.ID = uint64(lastID)
+			res.AffectedRows = uint64(n)
+		}
+
+		if !forUpdate {
+			lastID, err := proc.ExecResult.LastInsertId()
+			if err != nil {
+				Log.Message(log.NOTICE, "[%d] LastInsertId: %s", proc.ID, err)
+			} else {
+				res.ID = uint64(lastID)
+			}
+		}
+	} else {
+		res.AffectedRows = uint64(len(*dest))
+		if res.AffectedRows == 1 {
+			res.ID = (*dest)[0].ID
 		}
 	}
 
@@ -253,7 +272,7 @@ func (proc *ProcOptions) Delete() (headers misc.StringMap, result any, code int,
 
 	n, _ := proc.ExecResult.RowsAffected()
 	result = ExecResult{
-		AffectedRows: n,
+		AffectedRows: uint64(n),
 	}
 
 	return

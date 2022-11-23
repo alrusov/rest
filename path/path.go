@@ -92,6 +92,7 @@ const (
 	FlagRequestIsNotArray        = Flags(0x00000002)
 	FlagRequestDontMakeFlatModel = Flags(0x00000004)
 	FlagResponseIsNotArray       = Flags(0x00000008)
+	FlagCreateReturnsObject      = Flags(0x00000010)
 
 	// VarName
 	VarIgnore = "_"

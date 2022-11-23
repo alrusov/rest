@@ -106,7 +106,7 @@ type (
 	}
 
 	ExecResult struct {
-		AffectedRows int64  `json:"affectedRows" comment:"Количеcтво затронутых записей"`
+		AffectedRows uint64 `json:"affectedRows" comment:"Количеcтво затронутых записей"`
 		ID           uint64 `json:"id,omitempty" comment:"ID созданной записи"`
 		Notice       string `json:"notice,omitempty" comment:"Предупреждения и замечания"`
 	}
