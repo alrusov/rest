@@ -141,7 +141,7 @@ const (
 	ScopeUpdateID      = "update.id"
 	ScopeUpdateGUID    = "update.guid"
 	ScopeDeleteID      = "delete.id"
-	ScopeDeleteGUID    = "delete.giid"
+	ScopeDeleteGUID    = "delete.guid"
 
 	// Признак статуса
 	StatusActive   = "active"
