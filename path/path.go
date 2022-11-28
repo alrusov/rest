@@ -53,7 +53,7 @@ type (
 		SrcResponsePattern  any          `json:"-"`
 		SrcResponseType     reflect.Type `json:"-"`
 
-		DBFields []string `json:"-"`
+		DBFields *db.FieldsList `json:"-"`
 
 		prepared bool
 	}
@@ -137,7 +137,7 @@ func (set *Set) Prepare() (err error) {
 			continue
 		}
 
-		err := c.Prepare()
+		err := c.Prepare(m)
 		if err != nil {
 			msgs.Add(`%s: %s`, m, err)
 			continue
@@ -171,7 +171,7 @@ func (set *Set) Find(m Method, path []string) (matched *Chain, pathParams any, r
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-func (chains *Chains) Prepare() (err error) {
+func (chains *Chains) Prepare(m string) (err error) {
 	msgs := misc.NewMessages()
 	defer func() {
 		err = msgs.Error()
@@ -256,16 +256,30 @@ func (chains *Chains) Prepare() (err error) {
 				return
 			}
 		}
+	}
 
+	switch m {
+	case stdhttp.MethodGET:
 		dbPattern := chains.SrcResponsePattern
 		if dbPattern == nil {
 			dbPattern = chains.ResponsePattern
 		}
 
-		chains.DBFields, err = db.FieldsList(dbPattern)
-		if err != nil {
-			msgs.Add("ResponsePattern %s", err)
-			return
+		if dbPattern != nil {
+			chains.DBFields, err = db.MakeFieldsList(dbPattern)
+			if err != nil {
+				msgs.Add("ResponsePattern %s", err)
+				return
+			}
+		}
+
+	default:
+		if chains.RequestPattern != nil {
+			chains.DBFields, err = db.MakeFieldsList(chains.RequestPattern)
+			if err != nil {
+				msgs.Add("RequestPattern %s", err)
+				return
+			}
 		}
 	}
 

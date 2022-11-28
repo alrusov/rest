@@ -116,7 +116,7 @@ func TestPrepareIllegal(t *testing.T) {
 	}
 
 	for i, c := range illegal {
-		err := c.Prepare()
+		err := c.Prepare("GET")
 		if err == nil {
 			t.Fatalf("[%d] error expected, but not found (%#v)", i, c)
 		}
@@ -265,7 +265,7 @@ func TestParser(t *testing.T) {
 		},
 	}
 
-	err := c.Prepare()
+	err := c.Prepare("GET")
 	if err != nil {
 		t.Fatal(err)
 	}

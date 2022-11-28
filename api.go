@@ -142,6 +142,10 @@ func findModule(path string) (module *module, basePath string, extraPath []strin
 				extraPath = strings.Split(strings.Trim(tail, "/"), "/")
 				if len(extraPath) == 1 && extraPath[0] == "" {
 					extraPath = []string{}
+				} else {
+					for i, p := range extraPath {
+						extraPath[i], _ = url.PathUnescape(p)
+					}
 				}
 			}
 

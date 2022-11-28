@@ -73,7 +73,11 @@ func (proc *ProcOptions) Get() (headers misc.StringMap, result any, code int, er
 		return
 	}
 
-	err = db.Query(proc.Info.DBtype, proc.Info.DBidx, proc.DBqueryResult, proc.DBqueryName, proc.Chain.Parent.DBFields, proc.DBqueryVars)
+	proc.DBqueryVars = append(proc.DBqueryVars,
+		db.Subst(db.JbFields, proc.Chain.Parent.DBFields.JbSelectStr()),
+	)
+
+	err = db.Query(proc.Info.DBtype, proc.Info.DBidx, proc.DBqueryResult, proc.DBqueryName, proc.Chain.Parent.DBFields.All(), proc.DBqueryVars)
 	if err != nil {
 		code = http.StatusInternalServerError
 		return
@@ -118,23 +122,12 @@ func (proc *ProcOptions) Update() (headers misc.StringMap, result any, code int,
 }
 
 func (proc *ProcOptions) save(forUpdate bool) (headers misc.StringMap, result any, code int, err error) {
-	result, code, err = proc.before()
-	if err != nil {
-		if code == 0 {
-			code = http.StatusBadRequest
-		}
-		return
-	}
-	if code != 0 || result != nil {
-		return
-	}
-
 	res := &ExecResult{}
 	defer func() {
 		res.Notice = proc.Notices.String()
 	}()
 
-	if proc.Fields == nil && proc.Chain.Parent.Flags&path.FlagRequestDontMakeFlatModel == 0 {
+	if proc.Chain.Parent.Flags&path.FlagRequestDontMakeFlatModel == 0 {
 		var notice error
 
 		proc.Fields, notice, err = proc.Chain.Parent.ExtractFieldsFromBody(proc.RawBody)
@@ -145,6 +138,18 @@ func (proc *ProcOptions) save(forUpdate bool) (headers misc.StringMap, result an
 		if notice != nil {
 			proc.Notices.AddError(notice)
 		}
+	}
+
+	result, code, err = proc.before()
+	if err != nil {
+		if code == 0 {
+			code = http.StatusBadRequest
+		}
+		return
+	}
+
+	if code != 0 || result != nil {
+		return
 	}
 
 	if forUpdate {
@@ -166,14 +171,34 @@ func (proc *ProcOptions) save(forUpdate bool) (headers misc.StringMap, result an
 		return
 	}
 
-	proc.RequestBodyNames = make([]string, 0, len(proc.Fields))
-	proc.RequestBodyVals = make([]any, 0, len(proc.Fields))
-	for n, v := range proc.Fields {
-		proc.RequestBodyNames = append(proc.RequestBodyNames, n)
-		proc.RequestBodyVals = append(proc.RequestBodyVals, v)
+	var jb db.JbBuildFormats
+	jb, proc.RequestBodyNames, proc.RequestBodyVals = proc.Chain.Parent.DBFields.JbPrepareBuild(proc.Fields)
+	if err != nil {
+		code = http.StatusBadRequest
+		return
 	}
 
-	startIdx := len(proc.DBqueryVars) + 1
+	startIdx := 1
+	for _, v := range proc.DBqueryVars {
+		switch v.(type) {
+		default:
+			startIdx++
+
+		case *db.SubstArg:
+		}
+	}
+
+	if len(jb) > 0 {
+		n := startIdx + len(proc.RequestBodyNames)
+		for _, f := range jb {
+			f.Idx += n
+		}
+	}
+
+	proc.DBqueryVars = append(proc.DBqueryVars,
+		db.Subst(db.JbFields, jb),
+	)
+
 	proc.DBqueryVars = append(proc.DBqueryVars, proc.RequestBodyVals...)
 
 	patternType := db.PatternTypeInsert
@@ -188,12 +213,12 @@ func (proc *ProcOptions) save(forUpdate bool) (headers misc.StringMap, result an
 	var dest *destType
 
 	if !forUpdate && proc.Chain.Parent.Flags&path.FlagCreateReturnsObject != 0 {
+		// For INSERT ... RETURNING id
 		var destVal destType
 		dest = &destVal
 	}
 
 	proc.ExecResult, err = db.ExecEx(proc.Info.DBtype, proc.Info.DBidx, dest, proc.DBqueryName, patternType, startIdx, proc.RequestBodyNames, proc.DBqueryVars)
-
 	if err != nil {
 		code = http.StatusInternalServerError
 		return
