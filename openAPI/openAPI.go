@@ -52,6 +52,7 @@ type (
 		result  *oa.T
 		knownID map[string]uint
 		schemas map[string]*oa.Schema
+		msgs    *misc.Messages
 	}
 
 	filler func(parent *oa.SchemaRef, field *reflect.StructField, tp string, format string) *oa.SchemaRef
@@ -91,6 +92,7 @@ func Compose(logFacility *log.Facility, cfg *Config, prefix string) (result *oa.
 		prefix:  prefix,
 		knownID: make(map[string]uint, 1024),
 		schemas: make(map[string]*oa.Schema, 1024),
+		msgs:    misc.NewMessages(),
 	}
 
 	err = proc.prepare()
@@ -133,6 +135,11 @@ func Compose(logFacility *log.Facility, cfg *Config, prefix string) (result *oa.
 
 	result = proc.result
 	err = result.Validate(context.Background())
+	if err != nil {
+		proc.msgs.Add("validate: %s", err)
+	}
+
+	err = proc.msgs.Error()
 	if err != nil {
 		logFacility.Message(log.NOTICE, "%s", err)
 		err = nil
@@ -626,7 +633,10 @@ func (proc *processor) makeParameters(t reflect.Type, in string) (pp []*oa.Param
 				},
 			}
 			if defExists {
-				p.Schema.Value.Default = defVal
+				p.Schema.Value.Default, err = conv(tp, defVal)
+				if err != nil {
+					proc.msgs.Add("%s.%s: %s", "?", name, err)
+				}
 			}
 
 			pp = append(pp, p)
@@ -715,7 +725,10 @@ func (proc *processor) makeObjectSchema(topName string, t reflect.Type, in strin
 					},
 				}
 				if defExists {
-					s.Value.Default = defVal
+					s.Value.Default, err = conv(tp, defVal)
+					if err != nil {
+						proc.msgs.Add("%s.%s: %s", topName, name, err)
+					}
 				}
 			}
 
@@ -927,6 +940,28 @@ func (proc *processor) entityType(t reflect.Type) (kind reflect.Kind, tp string,
 	}
 
 	return
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func conv(tp string, v string) (any, error) {
+	switch tp {
+	default:
+		return v, fmt.Errorf(`conv: illegal type "%s"`, tp)
+
+	case "boolean":
+		return strconv.ParseBool(v)
+
+	case "number":
+		return strconv.ParseFloat(v, 64)
+
+	case "integer":
+		return strconv.ParseInt(v, 10, 64)
+
+	case "string":
+		return v, nil
+
+	}
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//
