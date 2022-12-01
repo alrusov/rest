@@ -73,11 +73,26 @@ func (proc *ProcOptions) Get() (headers misc.StringMap, result any, code int, er
 		return
 	}
 
+	fields := proc.Chain.Parent.DBFields.All()
+
+	if proc.ExcludedFields != nil {
+		src := proc.Chain.Parent.DBFields.AllSrc()
+		all := fields
+		fields = make([]string, 0, len(fields))
+
+		for i, name := range src {
+			if _, exists := proc.ExcludedFields[name]; exists {
+				continue
+			}
+			fields = append(fields, all[i])
+		}
+	}
+
 	proc.DBqueryVars = append(proc.DBqueryVars,
-		db.Subst(db.JbFields, proc.Chain.Parent.DBFields.JbSelectStr()),
+		db.Subst(db.SubstJbFields, proc.Chain.Parent.DBFields.JbSelectStr()),
 	)
 
-	err = db.Query(proc.Info.DBtype, proc.Info.DBidx, proc.DBqueryResult, proc.DBqueryName, proc.Chain.Parent.DBFields.All(), proc.DBqueryVars)
+	err = db.Query(proc.Info.DBtype, proc.Info.DBidx, proc.DBqueryResult, proc.DBqueryName, fields, proc.DBqueryVars)
 	if err != nil {
 		code = http.StatusInternalServerError
 		return
@@ -165,6 +180,12 @@ func (proc *ProcOptions) save(forUpdate bool) (headers misc.StringMap, result an
 		}
 	}
 
+	if proc.ExcludedFields != nil {
+		for name := range proc.ExcludedFields {
+			delete(proc.Fields, name)
+		}
+	}
+
 	if len(proc.Fields) == 0 {
 		proc.Notices.Add("no fields")
 		result = res
@@ -196,7 +217,7 @@ func (proc *ProcOptions) save(forUpdate bool) (headers misc.StringMap, result an
 	}
 
 	proc.DBqueryVars = append(proc.DBqueryVars,
-		db.Subst(db.JbFields, jb),
+		db.Subst(db.SubstJbFields, jb),
 	)
 
 	proc.DBqueryVars = append(proc.DBqueryVars, proc.RequestBodyVals...)
