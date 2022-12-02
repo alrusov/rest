@@ -569,7 +569,7 @@ func (chains *Chains) typeFlatModelIterator(base string, model *misc.StringMap, 
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-func (chains *Chains) ExtractFieldsFromBody(body []byte) (fields misc.InterfaceMap, notice error, err error) {
+func (chains *Chains) ExtractFieldsFromBody(body []byte) (fields misc.InterfaceMap, obj any, notice error, err error) {
 	if chains.RequestFlatModel == nil || len(chains.RequestFlatModel) == 0 {
 		err = fmt.Errorf("chain doesn't have a request body")
 		return
@@ -580,8 +580,15 @@ func (chains *Chains) ExtractFieldsFromBody(body []byte) (fields misc.InterfaceM
 		return
 	}
 
-	var obj any
-	err = jsonw.Unmarshal(body, &obj) // Все структуры, включая вложенные, получатся как map[string]any
+	obj = reflect.New(chains.RequestType).Interface()
+	err = jsonw.Unmarshal(body, obj)
+	if err != nil {
+		err = fmt.Errorf("unmarshal: %s", err)
+		return
+	}
+
+	var m any
+	err = jsonw.Unmarshal(body, &m) // Все структуры, включая вложенные, получатся как map[string]any
 	if err != nil {
 		err = fmt.Errorf("unmarshal: %s", err)
 		return
@@ -589,7 +596,7 @@ func (chains *Chains) ExtractFieldsFromBody(body []byte) (fields misc.InterfaceM
 
 	fields = make(misc.InterfaceMap, len(chains.RequestFlatModel))
 	msgs := misc.NewMessages()
-	err = chains.extractFieldsFromBodyIterator("", &fields, obj, msgs)
+	err = chains.extractFieldsFromBodyIterator("", &fields, m, msgs)
 	notice = msgs.Error()
 	return
 }

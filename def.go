@@ -80,6 +80,7 @@ type (
 		PathParams       any                 // Path параметры
 		QueryParams      any                 // Query параметры
 		RequestParams    any                 // Request параметры
+		RequestObject    any                 // Объект из тела запроса
 		DBqueryName      string              // Имя запроса к базе данных
 		RequestBodyNames []string            // Для запросов в телом - полученные имена полей
 		RequestBodyVals  []any               // и соответствующие им значения
