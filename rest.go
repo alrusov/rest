@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -228,7 +229,8 @@ func (proc *ProcOptions) save(forUpdate bool) (headers misc.StringMap, result an
 	}
 
 	type destType []struct {
-		ID uint64 `db:"id"`
+		ID   uint64 `db:"id"`
+		GUID string `db:"guid"`
 	}
 
 	var dest *destType
@@ -239,25 +241,15 @@ func (proc *ProcOptions) save(forUpdate bool) (headers misc.StringMap, result an
 		dest = &destVal
 	}
 
-	proc.ExecResult, err = db.ExecEx(proc.Info.DBtype, proc.Info.DBidx, dest, proc.DBqueryName, patternType, startIdx, proc.RequestBodyNames, proc.DBqueryVars)
+	var execResult sql.Result
+	execResult, err = db.ExecEx(proc.Info.DBtype, proc.Info.DBidx, dest, proc.DBqueryName, patternType, startIdx, proc.RequestBodyNames, proc.DBqueryVars)
 	if err != nil {
 		code = http.StatusInternalServerError
 		return
 	}
 
-	result, code, err = proc.after()
-	if err != nil {
-		if code == 0 {
-			code = http.StatusBadRequest
-		}
-		return
-	}
-	if code != 0 || result != nil {
-		return
-	}
-
 	if dest == nil {
-		n, err := proc.ExecResult.RowsAffected()
+		n, err := execResult.RowsAffected()
 		if err != nil {
 			Log.Message(log.NOTICE, "[%d] RowsAffected: %s", proc.ID, err)
 		} else {
@@ -265,7 +257,7 @@ func (proc *ProcOptions) save(forUpdate bool) (headers misc.StringMap, result an
 		}
 
 		if !forUpdate {
-			lastID, err := proc.ExecResult.LastInsertId()
+			lastID, err := execResult.LastInsertId()
 			if err != nil {
 				Log.Message(log.NOTICE, "[%d] LastInsertId: %s", proc.ID, err)
 			} else {
@@ -276,7 +268,21 @@ func (proc *ProcOptions) save(forUpdate bool) (headers misc.StringMap, result an
 		res.AffectedRows = uint64(len(*dest))
 		if res.AffectedRows == 1 {
 			res.ID = (*dest)[0].ID
+			res.GUID = (*dest)[0].GUID
 		}
+	}
+
+	proc.ExecResult = res
+
+	result, code, err = proc.after()
+	if err != nil {
+		if code == 0 {
+			code = http.StatusBadRequest
+		}
+		return
+	}
+	if code != 0 || result != nil {
+		return
 	}
 
 	result = res
@@ -299,10 +305,16 @@ func (proc *ProcOptions) Delete() (headers misc.StringMap, result any, code int,
 		return
 	}
 
-	proc.ExecResult, err = db.Exec(proc.Info.DBtype, proc.Info.DBidx, proc.DBqueryName, proc.DBqueryVars)
+	var execResult sql.Result
+	execResult, err = db.Exec(proc.Info.DBtype, proc.Info.DBidx, proc.DBqueryName, proc.DBqueryVars)
 	if err != nil {
 		code = http.StatusInternalServerError
 		return
+	}
+
+	n, _ := execResult.RowsAffected()
+	proc.ExecResult = &ExecResult{
+		AffectedRows: uint64(n),
 	}
 
 	result, code, err = proc.after()
@@ -316,10 +328,7 @@ func (proc *ProcOptions) Delete() (headers misc.StringMap, result any, code int,
 		return
 	}
 
-	n, _ := proc.ExecResult.RowsAffected()
-	result = ExecResult{
-		AffectedRows: uint64(n),
-	}
+	result = proc.ExecResult
 
 	return
 }

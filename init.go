@@ -55,7 +55,6 @@ func ModuleRegistration(handler API) (err error) {
 	relURL := url
 	if url == "/" {
 		url = ""
-		relURL = "/"
 	}
 
 	if len(url) == 0 || url[0] != '/' {
@@ -87,6 +86,7 @@ func ModuleRegistration(handler API) (err error) {
 	}
 
 	p := &module{
+		rawURL:      url,
 		relativeURL: relURL,
 		handler:     handler,
 		info:        info,
@@ -117,22 +117,46 @@ func ModuleRegistration(handler API) (err error) {
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
+func RemoveModuleRegistration(handler API) (err error) {
+	modulesMutex.Lock()
+	defer modulesMutex.Unlock()
+
+	for name, df := range modules {
+		if df.handler == handler {
+			delete(modules, name)
+			httpHdl.DelEndpointsInfo(misc.StringMap{df.rawURL: ""})
+			break
+		}
+	}
+
+	return
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
 func loadEndpointConfig(relURL string, info *Info) (err error) {
 	urlCfg, exists := configs[relURL]
 	if !exists {
 		urlCfg = map[string]any{}
+	} else if reflect.ValueOf(urlCfg).Type() != reflect.ValueOf(map[string]any{}).Type() {
+		// already loaded before
+		return
 	}
 
 	if info.Config == nil {
 		return fmt.Errorf(`info.Config is nil`)
 	}
 
-	if reflect.ValueOf(info.Config).Kind() != reflect.Ptr {
+	v := reflect.ValueOf(info.Config)
+
+	if v.Kind() != reflect.Ptr {
 		return fmt.Errorf(`info.Config is not a pointer`)
 	}
 
-	if reflect.Indirect(reflect.ValueOf(info.Config)).Kind() != reflect.Struct {
-		return fmt.Errorf(`info.Config is pointer to %s, expected pointer to %s`, reflect.Indirect(reflect.ValueOf(info.Config)).Kind().String(), reflect.Struct.String())
+	obj := reflect.Indirect(v)
+
+	if obj.Kind() != reflect.Struct {
+		return fmt.Errorf(`info.Config is pointer to %s, expected pointer to %s`, obj.Kind().String(), reflect.Struct.String())
 	}
 
 	err = config.ConvExtra(&urlCfg, info.Config)
@@ -142,7 +166,7 @@ func loadEndpointConfig(relURL string, info *Info) (err error) {
 
 	configs[relURL] = urlCfg
 
-	m := reflect.ValueOf(info.Config).MethodByName("Check")
+	m := v.MethodByName("Check")
 
 	if m.Kind() != reflect.Func {
 		return fmt.Errorf(`%T doesn't have the Check function`, info.Config)

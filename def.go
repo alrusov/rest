@@ -4,7 +4,6 @@
 package rest
 
 import (
-	"database/sql"
 	"net/http"
 	"reflect"
 	"sync"
@@ -89,12 +88,13 @@ type (
 		Fields           misc.InterfaceMap   // Поля для insert или update
 		ExcludedFields   misc.InterfaceMap   // Поля, которые надо исключить из запроса
 		Notices          *misc.Messages      // Предупреждения и замечания обработчика
-		ExecResult       sql.Result          // Результат выполнения Exec
+		ExecResult       *ExecResult         // Результат выполнения Exec
 		Custom           any                 // Произвольные пользовательские данные
 	}
 
 	// Обработчик
 	module struct {
+		rawURL      string
 		relativeURL string        // URL без учета базовой части
 		handler     API           // Интерфейс метода
 		info        *Info         // Информация о методе
@@ -110,6 +110,7 @@ type (
 	ExecResult struct {
 		AffectedRows uint64 `json:"affectedRows" comment:"Количеcтво затронутых записей"`
 		ID           uint64 `json:"id,omitempty" comment:"ID созданной записи"`
+		GUID         string `json:"guid,omitempty" comment:"GUID созданной записи"`
 		Notice       string `json:"notice,omitempty" comment:"Предупреждения и замечания"`
 	}
 )
