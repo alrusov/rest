@@ -52,7 +52,6 @@ type (
 		Config        any           // Кастомные параметры в конфиг файле
 		CacheLifetime time.Duration // Время жизни кэша, если 0, то не использовать
 		DBtype        string        // Тип базы. Если пусто, то по умолчанию из конфига
-		DBidx         int           // Индекс базы
 		QueryPrefix   string        // Префикс имени запроса в базу
 		Init          FuncInit      // User defined Init
 		Before        FuncBefore    // User defined Before query

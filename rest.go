@@ -93,7 +93,7 @@ func (proc *ProcOptions) Get() (headers misc.StringMap, result any, code int, er
 		db.Subst(db.SubstJbFields, proc.Chain.Parent.DBFields.JbSelectStr()),
 	)
 
-	err = db.Query(proc.Info.DBtype, proc.Info.DBidx, proc.DBqueryResult, proc.DBqueryName, fields, proc.DBqueryVars)
+	err = db.Query(proc.Info.DBtype, proc.DBqueryResult, proc.DBqueryName, fields, proc.DBqueryVars)
 	if err != nil {
 		code = http.StatusInternalServerError
 		return
@@ -242,7 +242,7 @@ func (proc *ProcOptions) save(forUpdate bool) (headers misc.StringMap, result an
 	}
 
 	var execResult sql.Result
-	execResult, err = db.ExecEx(proc.Info.DBtype, proc.Info.DBidx, dest, proc.DBqueryName, patternType, startIdx, proc.RequestBodyNames, proc.DBqueryVars)
+	execResult, err = db.ExecEx(proc.Info.DBtype, dest, proc.DBqueryName, patternType, startIdx, proc.RequestBodyNames, proc.DBqueryVars)
 	if err != nil {
 		code = http.StatusInternalServerError
 		return
@@ -306,7 +306,7 @@ func (proc *ProcOptions) Delete() (headers misc.StringMap, result any, code int,
 	}
 
 	var execResult sql.Result
-	execResult, err = db.Exec(proc.Info.DBtype, proc.Info.DBidx, proc.DBqueryName, proc.DBqueryVars)
+	execResult, err = db.Exec(proc.Info.DBtype, proc.DBqueryName, proc.DBqueryVars)
 	if err != nil {
 		code = http.StatusInternalServerError
 		return
