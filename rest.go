@@ -74,19 +74,62 @@ func (proc *ProcOptions) Get() (headers misc.StringMap, result any, code int, er
 		return
 	}
 
-	fields := proc.Chain.Parent.DBFields.All()
+	f := proc.Chain.Parent.DBFields.All()
+	fields := make([]string, len(f))
+	copy(fields, f)
+
+	compressionNeeded := false
+
+	if proc.Fields != nil && len(proc.Fields) != 0 {
+		src := proc.Chain.Parent.DBFields.AllSrc()
+
+		for i, name := range src {
+			if _, exists := proc.Fields[name]; !exists {
+				fields[i] = ""
+				compressionNeeded = true
+			}
+		}
+	}
 
 	if proc.ExcludedFields != nil {
 		src := proc.Chain.Parent.DBFields.AllSrc()
-		all := fields
-		fields = make([]string, 0, len(fields))
 
 		for i, name := range src {
-			if _, exists := proc.ExcludedFields[name]; exists {
+			if fields[i] == "" {
 				continue
 			}
-			fields = append(fields, all[i])
+
+			if _, exists := proc.ExcludedFields[name]; exists {
+				fields[i] = ""
+				compressionNeeded = true
+			}
 		}
+	}
+
+	if compressionNeeded {
+		dstI := 0
+
+		for srcI, name := range fields {
+			if fields[srcI] == "" {
+				continue
+			}
+
+			if srcI != dstI {
+				fields[dstI] = name
+			}
+
+			dstI++
+		}
+
+		if dstI != len(fields) {
+			fields = fields[:dstI]
+		}
+	}
+
+	if len(fields) == 0 {
+		err = fmt.Errorf("empty fields list")
+		code = http.StatusBadRequest
+		return
 	}
 
 	proc.DBqueryVars = append(proc.DBqueryVars,

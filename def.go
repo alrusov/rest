@@ -84,8 +84,8 @@ type (
 		RequestBodyVals  []any               // и соответствующие им значения
 		DBqueryVars      []any               // Переменные для заполнения запроса
 		DBqueryResult    any                 // Результат выполненеия Query (слайс)
-		Fields           misc.InterfaceMap   // Поля для insert или update
-		ExcludedFields   misc.InterfaceMap   // Поля, которые надо исключить из запроса
+		Fields           misc.InterfaceMap   // Поля (имя из sql запроса) для insert или update. Для select - список полей для выборки из базы, если нужны не все из объекта
+		ExcludedFields   misc.InterfaceMap   // Поля (имя из sql запроса), которые надо исключить из запроса
 		Notices          *misc.Messages      // Предупреждения и замечания обработчика
 		ExecResult       *ExecResult         // Результат выполнения Exec
 		Custom           any                 // Произвольные пользовательские данные
