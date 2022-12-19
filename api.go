@@ -32,17 +32,18 @@ func Handler(h *stdhttp.HTTP, id uint64, prefix string, urlPath string, w http.R
 	processed = true
 
 	proc := &ProcOptions{
-		handler:     module.handler,
-		LogFacility: module.logFacility,
-		H:           h,
-		LogSrc:      fmt.Sprintf("%d", id),
-		Info:        module.info,
-		ID:          id,
-		Prefix:      prefix,
-		Path:        urlPath,
-		R:           r,
-		W:           w,
-		Notices:     misc.NewMessages(),
+		handler:      module.handler,
+		LogFacility:  module.logFacility,
+		H:            h,
+		LogSrc:       fmt.Sprintf("%d", id),
+		Info:         module.info,
+		ID:           id,
+		Prefix:       prefix,
+		Path:         urlPath,
+		R:            r,
+		W:            w,
+		Notices:      misc.NewMessages(),
+		ExtraHeaders: make(misc.StringMap, 8),
 	}
 
 	var err error
@@ -56,7 +57,7 @@ func Handler(h *stdhttp.HTTP, id uint64, prefix string, urlPath string, w http.R
 	proc.Chain, proc.PathParams, result, code, err = module.info.Methods.Find(r.Method, tail)
 
 	if err != nil || code != 0 || result != nil {
-		proc.reply(code, nil, result, err)
+		proc.reply(code, result, err)
 		return
 	}
 
@@ -65,7 +66,7 @@ func Handler(h *stdhttp.HTTP, id uint64, prefix string, urlPath string, w http.R
 	// Получаем тело запроса (в разжатом виде, если оно было gz)
 	bodyBuf, code, err := stdhttp.ReadRequestBody(r)
 	if err != nil {
-		proc.reply(code, nil, nil, err)
+		proc.reply(code, nil, err)
 		return
 	}
 
@@ -85,7 +86,7 @@ func Handler(h *stdhttp.HTTP, id uint64, prefix string, urlPath string, w http.R
 		case stdhttp.ContentTypeJSON:
 			err = jsonw.Unmarshal(proc.RawBody, &proc.RequestParams)
 			if err != nil {
-				proc.reply(code, nil, result, err)
+				proc.reply(code, result, err)
 				return
 			}
 		}
@@ -94,7 +95,7 @@ func Handler(h *stdhttp.HTTP, id uint64, prefix string, urlPath string, w http.R
 	// Парсим query параметры
 	err = proc.parseQueryParams(r.URL.Query())
 	if err != nil {
-		proc.reply(code, nil, result, err)
+		proc.reply(code, result, err)
 		return
 	}
 
@@ -102,11 +103,10 @@ func Handler(h *stdhttp.HTTP, id uint64, prefix string, urlPath string, w http.R
 	proc.DBqueryName = proc.Info.QueryPrefix + proc.Chain.Scope
 
 	// Вызываем обработчик
-	var headers misc.StringMap
-	headers, result, code, err = proc.rest()
+	result, code, err = proc.rest()
 
 	if err != nil {
-		proc.reply(code, nil, result, err)
+		proc.reply(code, result, err)
 		return
 	}
 
@@ -115,7 +115,7 @@ func Handler(h *stdhttp.HTTP, id uint64, prefix string, urlPath string, w http.R
 		return
 	}
 
-	proc.reply(code, headers, result, err)
+	proc.reply(code, result, err)
 
 	return
 }
@@ -167,7 +167,7 @@ func findModule(path string) (module *module, basePath string, extraPath []strin
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-func (proc *ProcOptions) reply(code int, headers misc.StringMap, result any, err error) {
+func (proc *ProcOptions) reply(code int, result any, err error) {
 	readyAnswer := false
 
 	switch code {
@@ -262,7 +262,7 @@ func (proc *ProcOptions) reply(code int, headers misc.StringMap, result any, err
 				}
 
 				var code2 int
-				data, code2, headers, err = stdhttp.JSONResultWithDataHash(result, withHash && code/100 == 2, hash, headers)
+				data, code2, proc.ExtraHeaders, err = stdhttp.JSONResultWithDataHash(result, withHash && code/100 == 2, hash, proc.ExtraHeaders)
 				if code2 != http.StatusOK {
 					code = code2
 				}
@@ -276,7 +276,7 @@ func (proc *ProcOptions) reply(code int, headers misc.StringMap, result any, err
 
 	proc.LogFacility.Message(log.TRACE3, `[%d] WriteReply: %d (%s)`, proc.ID, code, contentType)
 
-	stdhttp.WriteReply(proc.W, proc.R, code, contentType, headers, data)
+	stdhttp.WriteReply(proc.W, proc.R, code, contentType, proc.ExtraHeaders, data)
 	if err != nil {
 		proc.LogFacility.Message(log.NOTICE, "[%d] WriteReply error: %s", proc.ID, err)
 	}

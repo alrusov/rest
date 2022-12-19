@@ -88,6 +88,7 @@ type (
 		ExcludedFields   misc.InterfaceMap   // Поля (имя из sql запроса), которые надо исключить из запроса
 		Notices          *misc.Messages      // Предупреждения и замечания обработчика
 		ExecResult       *ExecResult         // Результат выполнения Exec
+		ExtraHeaders     misc.StringMap      // Дополнительные возвращаемые HTTP заголовки
 		Custom           any                 // Произвольные пользовательские данные
 	}
 

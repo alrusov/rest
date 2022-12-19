@@ -28,10 +28,12 @@ type (
 	Method = string
 
 	Chains struct {
-		Flags       Flags      `json:"flags,omitempty"`
-		Summary     string     `json:"summary"`
-		Description string     `json:"description"`
-		Chains      ChainsList `json:"chains"`
+		Flags       Flags          `json:"flags,omitempty"`
+		InHeaders   misc.StringMap `json:"inHeaders,omitempty"`  // name -> description
+		OutHeaders  misc.StringMap `json:"outHeaders,omitempty"` // name -> description
+		Summary     string         `json:"summary"`
+		Description string         `json:"description"`
+		Chains      ChainsList     `json:"chains"`
 
 		PathParamsPattern any          `json:"pathParams"`
 		PathParamsType    reflect.Type `json:"-"`
@@ -180,6 +182,13 @@ func (chains *Chains) Prepare(m string) (err error) {
 	if chains.prepared {
 		msgs.Add("already prepared")
 		return
+	}
+
+	if chains.Flags&FlagResponseHashed != 0 {
+		if chains.OutHeaders == nil {
+			chains.OutHeaders = make(misc.StringMap, 8)
+		}
+		chains.OutHeaders[stdhttp.HTTPheaderHash] = "Response body hash"
 	}
 
 	if chains.PathParamsPattern == nil {

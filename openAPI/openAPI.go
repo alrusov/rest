@@ -246,11 +246,6 @@ func (proc *processor) addComponents() (err error) {
 		return
 	}
 
-	err = proc.addComponentHeaders()
-	if err != nil {
-		return
-	}
-
 	return
 }
 
@@ -291,15 +286,22 @@ func (proc *processor) addComponentSchemas() (err error) {
 	return
 }
 
-func (proc *processor) addComponentHeaders() (err error) {
-	proc.result.Components.Headers = map[string]*oa.HeaderRef{
-		"hash": {
-			Value: &oa.Header{
-				Parameter: oa.Parameter{
-					Schema: &oa.SchemaRef{
-						Value: &oa.Schema{
-							Type: "string",
-						},
+func (proc *processor) addComponentHeader(name string, descr string) (err error) {
+	if _, exists := proc.result.Components.Headers[name]; exists {
+		return
+	}
+
+	if proc.result.Components.Headers == nil {
+		proc.result.Components.Headers = make(map[string]*oa.HeaderRef, 16)
+	}
+
+	proc.result.Components.Headers[name] = &oa.HeaderRef{
+		Value: &oa.Header{
+			Parameter: oa.Parameter{
+				Description: descr,
+				Schema: &oa.SchemaRef{
+					Value: &oa.Schema{
+						Type: "string",
 					},
 				},
 			},
@@ -328,14 +330,24 @@ func (proc *processor) scanChains(chains *path.Set, urlPath string, info *rest.I
 		// Парсим request параметры
 		var requestSchema *oa.SchemaRef
 
-		var responseHeader map[string]*oa.HeaderRef
-		if chains.Flags&path.FlagResponseHashed != 0 {
-			responseHeader = map[string]*oa.HeaderRef{
-				"hash": {
-					Ref: refComponentsHeaders + "hash",
-				},
+		// Response headers
+
+		var responseHeaders map[string]*oa.HeaderRef
+		if len(chains.OutHeaders) > 0 {
+			responseHeaders = make(map[string]*oa.HeaderRef, 16)
+		}
+
+		for name, descr := range chains.OutHeaders {
+			err = proc.addComponentHeader(name, descr)
+			if err != nil {
+				return
+			}
+			responseHeaders[name] = &oa.HeaderRef{
+				Ref: refComponentsHeaders + name,
 			}
 		}
+
+		//
 
 		if chains.RequestObjectName != "" {
 			name := chains.RequestObjectName
@@ -445,7 +457,7 @@ func (proc *processor) scanChains(chains *path.Set, urlPath string, info *rest.I
 				op.AddResponse(http.StatusOK,
 					&oa.Response{
 						Description: &okStr,
-						Headers:     responseHeader,
+						Headers:     responseHeaders,
 						Content: oa.Content{
 							"application/json": &oa.MediaType{
 								Schema: responseSchema,
@@ -464,6 +476,23 @@ func (proc *processor) scanChains(chains *path.Set, urlPath string, info *rest.I
 			op.AddResponse(http.StatusNotFound, oa.NewResponse().WithDescription("Not found"))
 			op.AddResponse(http.StatusMethodNotAllowed, oa.NewResponse().WithDescription("Not allowed"))
 			op.AddResponse(http.StatusInternalServerError, oa.NewResponse().WithDescription("Internal server error"))
+
+			// Request headers
+
+			for name, descr := range chains.InHeaders {
+				p := &oa.Parameter{
+					Name:        name,
+					In:          "header",
+					Description: descr,
+					Required:    false,
+					Schema: &oa.SchemaRef{
+						Value: &oa.Schema{
+							Type: "string",
+						},
+					},
+				}
+				op.AddParameter(p)
+			}
 
 			// Добавляем параметры из path
 

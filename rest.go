@@ -31,7 +31,7 @@ Recommended behavior
 //----------------------------------------------------------------------------------------------------------------------------//
 
 // Точка входа
-func (proc *ProcOptions) rest() (headers misc.StringMap, result any, code int, err error) {
+func (proc *ProcOptions) rest() (result any, code int, err error) {
 	switch proc.R.Method {
 	default:
 		return proc.Others()
@@ -56,7 +56,7 @@ func (proc *ProcOptions) rest() (headers misc.StringMap, result any, code int, e
 //----------------------------------------------------------------------------------------------------------------------------//
 
 // Get -- получить данные
-func (proc *ProcOptions) Get() (headers misc.StringMap, result any, code int, err error) {
+func (proc *ProcOptions) Get() (result any, code int, err error) {
 	srcTp := proc.Chain.Parent.SrcResponseType
 	if srcTp == nil {
 		srcTp = proc.Chain.Parent.ResponseType
@@ -171,16 +171,16 @@ func (proc *ProcOptions) Get() (headers misc.StringMap, result any, code int, er
 //----------------------------------------------------------------------------------------------------------------------------//
 
 // Create -- создать
-func (proc *ProcOptions) Create() (headers misc.StringMap, result any, code int, err error) {
+func (proc *ProcOptions) Create() (result any, code int, err error) {
 	return proc.save(false)
 }
 
 // Update -- изменить
-func (proc *ProcOptions) Update() (headers misc.StringMap, result any, code int, err error) {
+func (proc *ProcOptions) Update() (result any, code int, err error) {
 	return proc.save(true)
 }
 
-func (proc *ProcOptions) save(forUpdate bool) (headers misc.StringMap, result any, code int, err error) {
+func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) {
 	res := &ExecResult{}
 	defer func() {
 		res.Notice = proc.Notices.String()
@@ -336,7 +336,7 @@ func (proc *ProcOptions) save(forUpdate bool) (headers misc.StringMap, result an
 //----------------------------------------------------------------------------------------------------------------------------//
 
 // Delete -- удалить
-func (proc *ProcOptions) Delete() (headers misc.StringMap, result any, code int, err error) {
+func (proc *ProcOptions) Delete() (result any, code int, err error) {
 	result, code, err = proc.before()
 	if err != nil {
 		if code == 0 {
@@ -379,7 +379,7 @@ func (proc *ProcOptions) Delete() (headers misc.StringMap, result any, code int,
 // ----------------------------------------------------------------------------------------------------------------------------//
 
 // Other -- другой запрос
-func (proc *ProcOptions) Others() (headers misc.StringMap, result any, code int, err error) {
+func (proc *ProcOptions) Others() (result any, code int, err error) {
 	result, code, err = proc.before()
 	if err != nil {
 		if code == 0 {
