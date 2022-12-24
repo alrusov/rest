@@ -790,11 +790,11 @@ func (token *Token) Clone() *Token {
 func StructType(v any) (t reflect.Type, err error) {
 	t = reflect.TypeOf(v)
 	if t.Kind() == reflect.Pointer {
-		t = reflect.TypeOf(t.Elem())
+		t = t.Elem()
 	}
 
 	if t.Kind() != reflect.Struct {
-		err = fmt.Errorf(`"%T" is not a struct or pointer to struct`, v)
+		err = fmt.Errorf(`"%T" is not a struct or pointer to struct (%s)`, v, t.Kind())
 		return
 	}
 

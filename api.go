@@ -309,7 +309,7 @@ func (proc *ProcOptions) parseQueryParams(src url.Values) (err error) {
 		// Значение по умолчанию
 		defVal := fieldT.Tag.Get(path.TagDefault)
 		if defVal != "" {
-			if err := convert(defVal, paramsV.Field(i), fieldT.Type); err != nil {
+			if err := convert(defVal, paramsV.Field(i)); err != nil {
 				proc.LogFacility.Message(log.DEBUG, "[%d] parseQueryParams: %s", proc.ID, err)
 			}
 		}
@@ -330,15 +330,13 @@ func (proc *ProcOptions) parseQueryParams(src url.Values) (err error) {
 
 		ln := len(val)
 		field := paramsV.FieldByName(name)
-		fieldT := field.Type()
 
 		if field.Kind() == reflect.Slice {
 			slice := reflect.MakeSlice(field.Type(), ln, ln)
-			fieldT = field.Type()
 			field.Set(slice)
 
 			for i := 0; i < ln; i++ {
-				err := convert(val[i], slice.Index(i), fieldT)
+				err := convert(val[i], slice.Index(i))
 				if err != nil {
 					msgs.Add(`[%d] query parameter "%s"[%d]: %s`, proc.ID, name, i, err)
 				}
@@ -348,7 +346,7 @@ func (proc *ProcOptions) parseQueryParams(src url.Values) (err error) {
 				val[0] = strings.Join(val, ",")
 			}
 
-			err := convert(val[0], field, fieldT)
+			err := convert(val[0], field)
 			if err != nil {
 				msgs.Add(`[%d] query parameter "%s": %s`, proc.ID, name, err)
 			}
@@ -362,10 +360,10 @@ func (proc *ProcOptions) parseQueryParams(src url.Values) (err error) {
 //----------------------------------------------------------------------------------------------------------------------------//
 
 // Преобразование query параметров к требующемуся типу
-func convert(s string, field reflect.Value, fieldT reflect.Type) (err error) {
+func convert(s string, field reflect.Value) (err error) {
 	s = strings.TrimSpace(s)
 
-	switch fieldT.Kind() {
+	switch field.Kind() {
 	case reflect.String:
 		field.SetString(s)
 		return
@@ -382,10 +380,19 @@ func convert(s string, field reflect.Value, fieldT reflect.Type) (err error) {
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		var x int64
-		x, err = strconv.ParseInt(s, 10, 64)
-		if err != nil {
-			return fmt.Errorf(`convertion error from "%s" to int (%s)`, s, err)
+
+		switch field.Interface().(type) {
+		default:
+			x, err = strconv.ParseInt(s, 10, 64)
+
+		case time.Duration:
+			x, err = misc.Interval2Int64(s)
 		}
+
+		if err != nil {
+			return
+		}
+
 		field.SetInt(x)
 		return
 
@@ -408,8 +415,8 @@ func convert(s string, field reflect.Value, fieldT reflect.Type) (err error) {
 		return
 
 	case reflect.Struct:
-		switch fieldT {
-		case reflect.TypeOf(time.Time{}):
+		switch field.Interface().(type) {
+		case time.Time:
 			var x time.Time
 			x, err = ParseTime(s)
 			if err != nil {
@@ -421,7 +428,7 @@ func convert(s string, field reflect.Value, fieldT reflect.Type) (err error) {
 		return
 	}
 
-	err = fmt.Errorf(`has an illegal type %v`, fieldT)
+	err = fmt.Errorf(`has an illegal type %T`, field.Interface())
 	return
 }
 
