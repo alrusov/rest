@@ -503,11 +503,6 @@ func (chains *Chains) makeTypeFlatModel() (err error) {
 		return
 	}
 
-	if chains.RequestUniqueKeyFields[0] == "" {
-		err = fmt.Errorf("undefiled request primary key field")
-		return
-	}
-
 	return
 }
 
@@ -578,7 +573,7 @@ func (chains *Chains) typeFlatModelIterator(base string, model *misc.StringMap, 
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-func (chains *Chains) ExtractFieldsFromBody(body []byte) (fields misc.InterfaceMap, obj any, notice error, err error) {
+func (chains *Chains) ExtractFieldsFromBody(body []byte) (fields misc.InterfaceMap, obj any, err error) {
 	if chains.RequestFlatModel == nil || len(chains.RequestFlatModel) == 0 {
 		err = fmt.Errorf("chain doesn't have a request body")
 		return
@@ -604,13 +599,11 @@ func (chains *Chains) ExtractFieldsFromBody(body []byte) (fields misc.InterfaceM
 	}
 
 	fields = make(misc.InterfaceMap, len(chains.RequestFlatModel))
-	msgs := misc.NewMessages()
-	err = chains.extractFieldsFromBodyIterator("", &fields, m, msgs)
-	notice = msgs.Error()
+	err = chains.extractFieldsFromBodyIterator("", &fields, m)
 	return
 }
 
-func (chains *Chains) extractFieldsFromBodyIterator(base string, fields *misc.InterfaceMap, obj any, msgs *misc.Messages) (err error) {
+func (chains *Chains) extractFieldsFromBodyIterator(base string, fields *misc.InterfaceMap, obj any) (err error) {
 	m, ok := obj.(map[string]any)
 	if !ok {
 		// Нестандартный формат, пусть дальше сами разбираются
@@ -624,7 +617,7 @@ func (chains *Chains) extractFieldsFromBodyIterator(base string, fields *misc.In
 
 		switch v.(type) {
 		case map[string]any:
-			err = chains.extractFieldsFromBodyIterator(fName, fields, v, msgs)
+			err = chains.extractFieldsFromBodyIterator(fName, fields, v)
 			if err != nil {
 				return
 			}
@@ -632,7 +625,6 @@ func (chains *Chains) extractFieldsFromBodyIterator(base string, fields *misc.In
 		default:
 			dbName, exists := chains.RequestFlatModel[fName]
 			if !exists {
-				msgs.Add(`unknown field "%s"`, fName)
 				continue
 			}
 			(*fields)[dbName] = v

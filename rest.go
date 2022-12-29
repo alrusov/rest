@@ -187,15 +187,9 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 	}()
 
 	if proc.Chain.Parent.Flags&path.FlagRequestDontMakeFlatModel == 0 {
-		var notice error
-
-		proc.Fields, proc.RequestObject, notice, err = proc.Chain.Parent.ExtractFieldsFromBody(proc.RawBody)
+		proc.Fields, proc.RequestObject, err = proc.Chain.Parent.ExtractFieldsFromBody(proc.RawBody)
 		if err != nil {
 			return
-		}
-
-		if notice != nil {
-			proc.Notices.AddError(notice)
 		}
 	}
 
