@@ -4,17 +4,17 @@ go 1.19
 
 require (
 	github.com/alrusov/config v0.1.50
-	github.com/alrusov/db v0.1.12
+	github.com/alrusov/db v0.1.13
 	github.com/alrusov/jsonw v0.1.3
 	github.com/alrusov/log v0.1.33
-	github.com/alrusov/misc v1.1.4
+	github.com/alrusov/misc v1.1.5
 	github.com/alrusov/stdhttp v0.1.109
 	github.com/getkin/kin-openapi v0.112.0
 )
 
 require (
 	github.com/alrusov/auth v0.1.2 // indirect
-	github.com/alrusov/initializer v0.1.1 // indirect
+	github.com/alrusov/initializer v0.1.2 // indirect
 	github.com/alrusov/loadavg v0.1.5 // indirect
 	github.com/alrusov/panic v0.1.15 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect

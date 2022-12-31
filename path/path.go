@@ -91,10 +91,9 @@ const (
 	NoFlags = Flags(0x00000000)
 
 	FlagResponseHashed           = Flags(0x00000001)
-	FlagRequestIsNotArray        = Flags(0x00000002)
-	FlagRequestDontMakeFlatModel = Flags(0x00000004)
-	FlagResponseIsNotArray       = Flags(0x00000008)
-	FlagCreateReturnsObject      = Flags(0x00000010)
+	FlagRequestDontMakeFlatModel = Flags(0x00000002)
+	FlagResponseIsNotArray       = Flags(0x00000004)
+	FlagCreateReturnsObject      = Flags(0x00000008)
 
 	// VarName
 	VarIgnore = "_"
@@ -217,6 +216,10 @@ func (chains *Chains) Prepare(m string) (err error) {
 		if chains.RequestObjectName == "" {
 			msgs.Add("RequestObjectName not defined")
 			return
+		}
+
+		if chains.RequestContentType == "" {
+			chains.RequestContentType = stdhttp.ContentTypeJSON
 		}
 
 		chains.RequestType, err = StructType(chains.RequestPattern)
@@ -573,7 +576,7 @@ func (chains *Chains) typeFlatModelIterator(base string, model *misc.StringMap, 
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-func (chains *Chains) ExtractFieldsFromBody(body []byte) (fields misc.InterfaceMap, obj any, err error) {
+func (chains *Chains) ExtractFieldsFromBody(body []byte) (fieldsSlice []misc.InterfaceMap, err error) {
 	if chains.RequestFlatModel == nil || len(chains.RequestFlatModel) == 0 {
 		err = fmt.Errorf("chain doesn't have a request body")
 		return
@@ -584,40 +587,53 @@ func (chains *Chains) ExtractFieldsFromBody(body []byte) (fields misc.InterfaceM
 		return
 	}
 
-	obj = reflect.New(chains.RequestType).Interface()
-	err = jsonw.Unmarshal(body, obj)
+	var data any
+	err = jsonw.Unmarshal(body, &data) // Все структуры, включая вложенные, получатся как map[string]any
 	if err != nil {
 		err = fmt.Errorf("unmarshal: %s", err)
 		return
 	}
 
-	var m any
-	err = jsonw.Unmarshal(body, &m) // Все структуры, включая вложенные, получатся как map[string]any
-	if err != nil {
-		err = fmt.Errorf("unmarshal: %s", err)
+	var dataSlice []any
+
+	var ok bool
+	dataSlice, ok = data.([]any)
+	if !ok {
+		err = fmt.Errorf("body is %T, expected %T", data, dataSlice)
 		return
 	}
 
-	fields = make(misc.InterfaceMap, len(chains.RequestFlatModel))
-	err = chains.extractFieldsFromBodyIterator("", &fields, m)
+	fieldsSlice = make([]misc.InterfaceMap, 0, len(dataSlice))
+
+	for i, obj := range dataSlice {
+		objMap, ok := obj.(map[string]any)
+		if !ok {
+			err = fmt.Errorf("body[%d] is %T, expected %T", i, obj, misc.InterfaceMap(objMap))
+			return
+		}
+
+		fields := make(misc.InterfaceMap, len(chains.RequestFlatModel))
+
+		err = chains.extractFieldsFromBodyIterator("", &fields, objMap)
+		if err != nil {
+			err = fmt.Errorf("body[%d] %s", i, err)
+			return
+		}
+
+		fieldsSlice = append(fieldsSlice, fields)
+	}
 	return
 }
 
-func (chains *Chains) extractFieldsFromBodyIterator(base string, fields *misc.InterfaceMap, obj any) (err error) {
-	m, ok := obj.(map[string]any)
-	if !ok {
-		// Нестандартный формат, пусть дальше сами разбираются
-		return
-	}
-
+func (chains *Chains) extractFieldsFromBodyIterator(base string, fields *misc.InterfaceMap, m misc.InterfaceMap) (err error) {
 	for fName, v := range m {
 		if base != "" {
 			fName = base + "." + fName
 		}
 
-		switch v.(type) {
+		switch v := v.(type) {
 		case map[string]any:
-			err = chains.extractFieldsFromBodyIterator(fName, fields, v)
+			err = chains.extractFieldsFromBodyIterator(fName, fields, misc.InterfaceMap(v))
 			if err != nil {
 				return
 			}
@@ -630,54 +646,6 @@ func (chains *Chains) extractFieldsFromBodyIterator(base string, fields *misc.In
 			(*fields)[dbName] = v
 		}
 	}
-	/*
-		v := reflect.ValueOf(obj)
-
-		if v.Kind() == reflect.Pointer {
-			v = v.Elem()
-		}
-
-		ln := t.NumField()
-
-		for i := 0; i < ln; i++ {
-			f := t.Field(i)
-
-			if !f.IsExported() {
-				continue
-			}
-
-			if f.Tag.Get(TagDB) == "-" {
-				continue
-			}
-
-			fName := f.Tag.Get(TagJSON)
-			if fName == "" {
-				fName = f.Name
-			} else {
-				fName = strings.TrimSpace(strings.Split(fName, ",")[0])
-			}
-			if base != "" {
-				fName = base + "." + fName
-			}
-
-			switch f.Type.Kind() {
-			default:
-				dbName := f.Tag.Get(TagDB)
-				if dbName == "" {
-					dbName = fName
-				}
-				(*model)[fName] = dbName
-
-			case reflect.Struct:
-				typeFlatModelIterator(fName, model, f.Type)
-
-			case reflect.Slice, reflect.Array,
-				reflect.Invalid, reflect.Chan, reflect.Func, reflect.Map:
-				err = fmt.Errorf("unsupported type %s", f.Type.String())
-				return
-			}
-		}
-	*/
 
 	return
 }

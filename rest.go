@@ -61,7 +61,7 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 	if srcTp == nil {
 		srcTp = proc.Chain.Parent.ResponseType
 	}
-	proc.DBqueryResult = reflect.New(reflect.MakeSlice(reflect.SliceOf(srcTp), 0, 0).Type()).Interface()
+	proc.DBqueryResult = reflect.New(reflect.SliceOf(srcTp)).Interface()
 
 	result, code, err = proc.before()
 	if err != nil {
@@ -80,11 +80,11 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 
 	compressionNeeded := false
 
-	if proc.Fields != nil && len(proc.Fields) != 0 {
+	if len(proc.Fields) != 0 { // В стардартном случае должно быть 0 или 1
 		src := proc.Chain.Parent.DBFields.AllSrc()
 
 		for i, name := range src {
-			if _, exists := proc.Fields[name]; !exists {
+			if _, exists := proc.Fields[0][name]; !exists {
 				fields[i] = ""
 				compressionNeeded = true
 			}
@@ -187,7 +187,7 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 	}()
 
 	if proc.Chain.Parent.Flags&path.FlagRequestDontMakeFlatModel == 0 {
-		proc.Fields, proc.RequestObject, err = proc.Chain.Parent.ExtractFieldsFromBody(proc.RawBody)
+		proc.Fields, err = proc.Chain.Parent.ExtractFieldsFromBody(proc.RawBody)
 		if err != nil {
 			return
 		}
@@ -205,10 +205,12 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 		return
 	}
 
-	if forUpdate {
+	if forUpdate && len(proc.Fields) > 0 {
+		proc.Fields = proc.Fields[0:1] // Для Update должен быть только один блок
+
 		for i, f := range proc.Chain.Parent.RequestUniqueKeyFields {
-			if _, exists := proc.Fields[f]; exists {
-				delete(proc.Fields, f)
+			if _, exists := proc.Fields[0][f]; exists {
+				delete(proc.Fields[0], f)
 				tp := ""
 				if i == 0 {
 					tp = "primary "
@@ -219,74 +221,94 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 	}
 
 	if proc.ExcludedFields != nil {
-		for name := range proc.ExcludedFields {
-			delete(proc.Fields, name)
+		for i := range proc.Fields {
+			for name := range proc.ExcludedFields {
+				delete(proc.Fields[i], name)
+			}
 		}
 	}
 
-	if len(proc.Fields) == 0 {
+	if len(proc.Fields) == 0 || len(proc.Fields[0]) == 0 {
 		proc.Notices.Add("no fields")
 		result = res
 		return
 	}
 
-	var jb db.JbBuildFormats
-	jb, proc.RequestBodyNames, proc.RequestBodyVals = proc.Chain.Parent.DBFields.JbPrepareBuild(proc.Fields)
+	jbPairs, fieldNames, fieldVals := proc.Chain.Parent.DBFields.Prepare(proc.Fields)
 	if err != nil {
 		code = http.StatusBadRequest
 		return
 	}
 
-	startIdx := 1
+	// Собираем общие переменные
+
+	commonVals := make([]any, 0, len(proc.DBqueryVars))
+
 	for _, v := range proc.DBqueryVars {
 		switch v.(type) {
 		default:
-			startIdx++
+			commonVals = append(commonVals, v)
 
 		case *db.SubstArg:
 		}
 	}
 
-	if len(jb) > 0 {
-		n := startIdx + len(proc.RequestBodyNames)
-		for _, f := range jb {
+	startIdx := len(commonVals) + 1
+
+	// Добавляем общие поля в начало
+
+	if len(commonVals) > 0 {
+		for i := range fieldVals {
+			fieldVals[i] = append(commonVals, fieldVals[i]...)
+		}
+	}
+
+	// Сдвигаем индексы jb полей - они идут после общих переменных и обычных полей
+
+	if len(jbPairs) > 0 {
+		n := startIdx + len(fieldNames)
+		for _, f := range jbPairs {
 			f.Idx += n
 		}
 	}
 
+	// Добавляем описание jb полей
+
 	proc.DBqueryVars = append(proc.DBqueryVars,
-		db.Subst(db.SubstJbFields, jb),
+		db.Subst(db.SubstJbFields, jbPairs),
 	)
 
-	proc.DBqueryVars = append(proc.DBqueryVars, proc.RequestBodyVals...)
+	// Добавляем значения всех полей
+
+	proc.DBqueryVars = append(proc.DBqueryVars, fieldVals)
+
+	// Тип шаблона запроса
 
 	patternType := db.PatternTypeInsert
 	if forUpdate {
 		patternType = db.PatternTypeUpdate
 	}
 
-	type destType []struct {
-		ID   uint64 `db:"id"`
-		GUID string `db:"guid"`
-	}
-
-	var dest *destType
+	var returnsObj *[]ExecResultRow
 
 	if !forUpdate && proc.Chain.Parent.Flags&path.FlagCreateReturnsObject != 0 {
-		// For INSERT ... RETURNING id
-		var destVal destType
-		dest = &destVal
+		// Get result from INSERT ... RETURNING id
+		returnsObj = &res.Rows
 	}
 
-	var execResult sql.Result
-	execResult, err = db.ExecEx(proc.Info.DBtype, dest, proc.DBqueryName, patternType, startIdx, proc.RequestBodyNames, proc.DBqueryVars)
+	// Делаем запрос
+
+	var stdExecResult sql.Result
+	stdExecResult, err = db.ExecEx(proc.Info.DBtype, returnsObj, proc.DBqueryName, patternType, startIdx, fieldNames, proc.DBqueryVars)
 	if err != nil {
 		code = http.StatusInternalServerError
 		return
 	}
 
-	if dest == nil {
-		n, err := execResult.RowsAffected()
+	if returnsObj != nil {
+		res.AffectedRows = uint64(len(res.Rows))
+	} else {
+		n, err := stdExecResult.RowsAffected()
 		if err != nil {
 			Log.Message(log.NOTICE, "[%d] RowsAffected: %s", proc.ID, err)
 		} else {
@@ -294,18 +316,12 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 		}
 
 		if !forUpdate {
-			lastID, err := execResult.LastInsertId()
+			lastID, err := stdExecResult.LastInsertId()
 			if err != nil {
 				Log.Message(log.NOTICE, "[%d] LastInsertId: %s", proc.ID, err)
 			} else {
-				res.ID = uint64(lastID)
+				res.Rows = []ExecResultRow{{ID: uint64(lastID)}}
 			}
-		}
-	} else {
-		res.AffectedRows = uint64(len(*dest))
-		if res.AffectedRows == 1 {
-			res.ID = (*dest)[0].ID
-			res.GUID = (*dest)[0].GUID
 		}
 	}
 

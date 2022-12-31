@@ -56,40 +56,35 @@ type (
 		Init          FuncInit      // User defined Init
 		Before        FuncBefore    // User defined Before query
 		After         FuncAfter     // User defined After query
-
-		//json2dbFields misc.StringMap
 	}
 
 	// Опции запроса к методу
 	ProcOptions struct {
-		handler          API                 // Интерфейс метода
-		LogFacility      *log.Facility       // Предпочтительная facility для логирования
-		H                *stdhttp.HTTP       // HTTP листенер
-		LogSrc           string              // Строка с ID запроса для MessageWithSource
-		Info             *Info               // Информация о методе
-		ID               uint64              // ID запроса
-		Prefix           string              // Префикс пути запроса (при работе через прокси)
-		Path             string              // Путь запроса
-		R                *http.Request       // Запрос
-		W                http.ResponseWriter // Интерфейс для ответа
-		Chain            *path.Chain         // Обрабатываемая цепочка
-		Scope            string              // Обрабатываемый Scope
-		RawBody          []byte              // Тело запроса. В R.Body уже nil!
-		PathParams       any                 // Path параметры
-		QueryParams      any                 // Query параметры
-		RequestParams    any                 // Request параметры
-		RequestObject    any                 // Объект из тела запроса
-		DBqueryName      string              // Имя запроса к базе данных
-		RequestBodyNames []string            // Для запросов в телом - полученные имена полей
-		RequestBodyVals  []any               // и соответствующие им значения
-		DBqueryVars      []any               // Переменные для заполнения запроса
-		DBqueryResult    any                 // Результат выполненеия Query (слайс)
-		Fields           misc.InterfaceMap   // Поля (имя из sql запроса) для insert или update. Для select - список полей для выборки из базы, если нужны не все из объекта
-		ExcludedFields   misc.InterfaceMap   // Поля (имя из sql запроса), которые надо исключить из запроса
-		Notices          *misc.Messages      // Предупреждения и замечания обработчика
-		ExecResult       *ExecResult         // Результат выполнения Exec
-		ExtraHeaders     misc.StringMap      // Дополнительные возвращаемые HTTP заголовки
-		Custom           any                 // Произвольные пользовательские данные
+		handler        API                 // Интерфейс метода
+		LogFacility    *log.Facility       // Предпочтительная facility для логирования
+		H              *stdhttp.HTTP       // HTTP листенер
+		LogSrc         string              // Строка с ID запроса для MessageWithSource
+		Info           *Info               // Информация о методе
+		ID             uint64              // ID запроса
+		Prefix         string              // Префикс пути запроса (при работе через прокси)
+		Path           string              // Путь запроса
+		R              *http.Request       // Запрос
+		W              http.ResponseWriter // Интерфейс для ответа
+		Chain          *path.Chain         // Обрабатываемая цепочка
+		Scope          string              // Обрабатываемый Scope
+		RawBody        []byte              // Тело запроса. В R.Body уже nil!
+		PathParams     any                 // Path параметры
+		QueryParams    any                 // Query параметры
+		RequestParams  any                 // Request параметры
+		DBqueryName    string              // Имя запроса к базе данных
+		DBqueryVars    []any               // Переменные для формирования запроса
+		DBqueryResult  any                 // Результат выполненения запроса (слайс)
+		Fields         []misc.InterfaceMap // Поля (имя из sql запроса) для insert или update. Для select - список полей для выборки из базы, если нужны не все из объекта
+		ExcludedFields misc.InterfaceMap   // Поля (имя из sql запроса), которые надо исключить из запроса
+		Notices        *misc.Messages      // Предупреждения и замечания обработчика
+		ExecResult     *ExecResult         // Результат выполнения Exec
+		ExtraHeaders   misc.StringMap      // Дополнительные возвращаемые HTTP заголовки
+		Custom         any                 // Произвольные пользовательские данные
 	}
 
 	// Обработчик
@@ -108,21 +103,22 @@ type (
 	}
 
 	ExecResult struct {
-		AffectedRows uint64 `json:"affectedRows,omitempty" comment:"Количеcтво затронутых записей"`
-		ID           uint64 `json:"id,omitempty" comment:"ID созданной записи"`
-		GUID         string `json:"guid,omitempty" comment:"GUID созданной записи"`
-		Notice       string `json:"notice,omitempty" comment:"Предупреждения и замечания"`
+		AffectedRows uint64          `json:"affectedRows,omitempty" comment:"Количеcтво затронутых записей"`
+		Rows         []ExecResultRow `json:"rows,omitempty" comment:"Созданные записи"`
+		Notice       string          `json:"notice,omitempty" comment:"Предупреждения и замечания"`
+	}
+
+	ExecResultRow struct {
+		ID   uint64 `json:"id,omitempty" comment:"ID созданной записи"`
+		GUID string `json:"guid,omitempty" comment:"GUID созданной записи"`
 	}
 )
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
 const (
-	FlagLogUnknownParams = 0x00000001 // Логировать полученные query параметры, которые не описаны в методе
-	//FlagDynamic          = 0x00000002 // Разрешить обработку с использованием этого пути как базового. Например Path="xxx/yyy", будет обрабатывать и запросы типа "xxx/yyy/zzz/qqq"
-	//FlagDontParseBody    = 0x00000004 // Не пытаться разбирать тело запроса
+	FlagLogUnknownParams   = 0x00000001 // Логировать полученные query параметры, которые не описаны в методе
 	FlagConvertReplyToJSON = 0x00000008 // Конвертировать ответ в json? Если он будет заранее подготовлен уже в таком формате, то НЕ СТАВИТЬ этот флаг!
-	//FlagRESTful          = 0x00000010 // Это RESTful. Будут автоматически добавлены флаги FlagDynamic, FlagDontParseBody и FlagJSONReply
 
 	StatusProcessed = 999 // Специальный тип возврата, говорящий о том, что уже все ответы отправлены
 

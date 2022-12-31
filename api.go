@@ -4,6 +4,7 @@
 package rest
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -76,11 +77,14 @@ func Handler(h *stdhttp.HTTP, id uint64, prefix string, urlPath string, w http.R
 
 	// Парсим тело
 	if len(proc.RawBody) != 0 && proc.Chain.Parent.RequestPattern != nil {
-		tp := proc.Chain.Parent.RequestType
-		if proc.Chain.Parent.Flags&path.FlagRequestIsNotArray == 0 {
-			tp = reflect.SliceOf(proc.Chain.Parent.RequestType)
+		proc.RawBody = bytes.TrimSpace(proc.RawBody)
+		if len(proc.RawBody) > 0 && proc.RawBody[0] != '[' {
+			proc.RawBody = bytes.Join([][]byte{{'['}, proc.RawBody, {']'}}, []byte{})
 		}
-		proc.RequestParams = reflect.New(reflect.MakeSlice(tp, 0, 0).Type()).Interface()
+
+		proc.RequestParams = reflect.New(
+			reflect.SliceOf(proc.Chain.Parent.RequestType),
+		).Interface()
 
 		switch proc.Chain.Parent.RequestContentType {
 		case stdhttp.ContentTypeJSON:
@@ -99,7 +103,7 @@ func Handler(h *stdhttp.HTTP, id uint64, prefix string, urlPath string, w http.R
 		return
 	}
 
-	// По умолчанию так. Если гдe надо иначе - можно там менять
+	// По умолчанию так. Если гдe надо иначе - можно менять в Before
 	proc.DBqueryName = proc.Info.QueryPrefix + proc.Chain.Scope
 
 	// Вызываем обработчик
