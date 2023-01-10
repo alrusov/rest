@@ -424,8 +424,6 @@ func (info *Info) makeParamsDescription() (err error) {
 		return
 	}
 
-	stdDescr := "см. ./.info"
-
 	for method, mDef := range info.Methods.Methods {
 		var d []string
 
@@ -451,37 +449,20 @@ func (info *Info) makeParamsDescription() (err error) {
 					continue
 				}
 
-				sample, defExists := fieldT.Tag.Lookup(path.TagDefault)
-				if !defExists || sample == "" {
-					defExists = false
-					sample = fieldT.Tag.Get(path.TagSample)
-				}
-
-				eq := ""
-
-				if fieldT.Type.Kind() != reflect.Bool {
-					if sample != "" {
-						if !defExists {
-							sample = "<" + sample + ">"
-						}
+				sample := fieldT.Tag.Get(path.TagSample)
+				if sample == "" {
+					if fieldT.Type.Kind() == reflect.Bool {
+						sample = name
 					} else {
-						sample = "<" + name + ">"
+						val := fieldT.Tag.Get(path.TagDefault)
+						if val == "" {
+							val = "..."
+						}
+						sample = fmt.Sprintf("%s=%s", name, val)
 					}
 				}
 
-				if sample != "" {
-					eq = "="
-				}
-
-				required := fieldT.Tag.Get(path.TagRequired)
-				op := ""
-				cp := ""
-				if required != "true" {
-					op = "["
-					cp = "]"
-				}
-
-				d = append(d, fmt.Sprintf("%s%s%s%s%s", op, name, eq, sample, cp))
+				d = append(d, sample)
 			}
 		}
 
@@ -489,7 +470,7 @@ func (info *Info) makeParamsDescription() (err error) {
 			d = []string{"-"}
 		}
 
-		mDef.Description = fmt.Sprintf("%s. Параметры: %s", mDef.Description, strings.Join(append(d, stdDescr), ", "))
+		mDef.Description = fmt.Sprintf("%s. Параметры: %s", mDef.Description, strings.Join(d, " & "))
 	}
 
 	return
