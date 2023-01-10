@@ -4,6 +4,7 @@
 package rest
 
 import (
+	"fmt"
 	"net/http"
 	"reflect"
 	"sync"
@@ -47,6 +48,7 @@ type (
 		Name          string        // Имя, желательно  чтобы по правилам имен переменных
 		Summary       string        // Краткое описание
 		Description   string        // Описание, по умолчанию сформированное из Summary и query параметров
+		Tags          []string      // Имена тегов для группировки
 		Flags         path.Flags    // Флаги
 		Methods       *path.Set     // Цепочки обработки
 		Config        any           // Кастомные параметры в конфиг файле
@@ -111,6 +113,20 @@ type (
 	ExecResultRow struct {
 		ID   uint64 `json:"id,omitempty" comment:"ID созданной записи"`
 		GUID string `json:"guid,omitempty" comment:"GUID созданной записи"`
+	}
+
+	Tags []*Tag
+
+	Tag struct {
+		Name         string
+		Aliases      []string
+		Description  string
+		ExternalDocs ExternalDocs
+	}
+
+	ExternalDocs struct {
+		Description string
+		URL         string
 	}
 )
 
@@ -177,6 +193,9 @@ var (
 
 	modulesMutex = new(sync.RWMutex)
 	modules      = map[string]*module{} // Обработчики API
+
+	tags    = Tags{}
+	tagsMap = map[string]*Tag{}
 )
 
 //----------------------------------------------------------------------------------------------------------------------------//
@@ -195,6 +214,50 @@ func Enumerate(e Enumerator) (err error) {
 	}
 
 	return
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func AddTag(tag *Tag) error {
+	if tag.Name == "" {
+		return fmt.Errorf("empty tag name")
+	}
+
+	if _, exists := tagsMap[tag.Name]; exists {
+		return fmt.Errorf("tag %s already exists", tag.Name)
+	}
+
+	for _, alias := range tag.Aliases {
+		if _, exists := tagsMap[alias]; exists {
+			return fmt.Errorf("tag alias %s already exists", alias)
+		}
+	}
+
+	tags = append(tags, tag)
+	tagsMap[tag.Name] = tag
+
+	for _, alias := range tag.Aliases {
+		tagsMap[alias] = tag
+	}
+
+	return nil
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func GetTags() Tags {
+	return tags
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func GetTagName(name string) string {
+	tag, exists := tagsMap[name]
+	if !exists {
+		return ""
+	}
+
+	return tag.Name
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//

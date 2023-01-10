@@ -56,11 +56,15 @@ type (
 	}
 
 	filler func(parent *oa.SchemaRef, field *reflect.StructField, tp string, format string) *oa.SchemaRef
+
+	TuneType func() reflect.Type
 )
 
 const (
 	refComponentsSchemas = "#/components/schemas/"
 	refComponentsHeaders = "#/components/headers/"
+
+	TuneTypeFuncName = "TuneType"
 )
 
 //----------------------------------------------------------------------------------------------------------------------------//
@@ -101,6 +105,11 @@ func Compose(logFacility *log.Facility, cfg *Config, prefix string) (result *oa.
 	}
 
 	err = proc.addComponents()
+	if err != nil {
+		return
+	}
+
+	err = proc.addTags()
 	if err != nil {
 		return
 	}
@@ -184,7 +193,7 @@ func (proc *processor) prepare() (err error) {
 		Servers: oa.Servers{
 			server,
 		},
-		//Tags:         oa.Tags{},
+
 		//ExternalDocs: &oa.ExternalDocs{},
 	}
 
@@ -308,6 +317,35 @@ func (proc *processor) addComponentHeader(name string, descr string) (err error)
 		},
 	}
 
+	return
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+// Добавляем теги
+func (proc *processor) addTags() (err error) {
+	tags := rest.GetTags()
+
+	if len(tags) == 0 {
+		return
+	}
+
+	oaTags := make(oa.Tags, 0, len(tags))
+
+	for _, tag := range tags {
+		oaTag := &oa.Tag{
+			Name:        tag.Name,
+			Description: tag.Description,
+			ExternalDocs: &oa.ExternalDocs{
+				Description: tag.ExternalDocs.Description,
+				URL:         tag.ExternalDocs.URL,
+			},
+		}
+
+		oaTags = append(oaTags, oaTag)
+	}
+
+	proc.result.Tags = oaTags
 	return
 }
 
@@ -508,6 +546,8 @@ func (proc *processor) scanChains(chains *path.Set, urlPath string, info *rest.I
 				}
 			}
 
+			op.Tags = info.Tags
+
 			// Добавляем операцию в соответствующий метод
 
 			switch method {
@@ -545,15 +585,7 @@ func (proc *processor) makePathParameters(urlPath string, chain *path.Chain) (fu
 			continue
 		}
 
-		enumItems := []any{}
-
-		if strings.Contains(token.Expr, "|") {
-			list := strings.Split(token.Expr, "|")
-			enumItems = make([]any, len(list))
-			for i, v := range list {
-				enumItems[i] = v
-			}
-		}
+		enumItems := makeEnum(token.Expr)
 
 		field, exists := chain.Parent.PathParamsType.FieldByName(token.VarName)
 		if !exists {
@@ -573,6 +605,11 @@ func (proc *processor) makePathParameters(urlPath string, chain *path.Chain) (fu
 		}
 		if token.Description != "" {
 			tokenDescr += token.Description
+		}
+
+		sample := field.Tag.Get(path.TagSample)
+		if sample != "" {
+			tokenDescr = fmt.Sprintf("%s. Пример: %s", tokenDescr, sample)
 		}
 
 		if tp == "" {
@@ -646,7 +683,17 @@ func (proc *processor) makeParameters(t reflect.Type, in string) (pp []*oa.Param
 			}
 
 			descr := field.Tag.Get(path.TagComment)
-			defVal, defExists := field.Tag.Lookup(path.TagDefault)
+			sample := field.Tag.Get(path.TagSample)
+			if sample != "" {
+				descr = fmt.Sprintf("%s. Пример: %s", descr, sample)
+			}
+
+			var enumItems []any
+			enum, enumExists := field.Tag.Lookup(path.TagEnum)
+			if enumExists {
+				enumItems = makeEnum(enum)
+			}
+
 			required := field.Tag.Get(path.TagRequired) == "true"
 
 			p := &oa.Parameter{
@@ -658,9 +705,12 @@ func (proc *processor) makeParameters(t reflect.Type, in string) (pp []*oa.Param
 					Value: &oa.Schema{
 						Type:   tp,
 						Format: format,
+						Enum:   enumItems,
 					},
 				},
 			}
+
+			defVal, defExists := field.Tag.Lookup(path.TagDefault)
 			if defExists {
 				p.Schema.Value.Default, err = conv(tp, defVal)
 				if err != nil {
@@ -722,6 +772,11 @@ func (proc *processor) makeObjectSchema(topName string, t reflect.Type, in strin
 			}
 
 			descr := field.Tag.Get(path.TagComment)
+			sample := field.Tag.Get(path.TagSample)
+			if sample != "" {
+				descr = fmt.Sprintf("%s. Пример: %s", descr, sample)
+			}
+
 			defVal, defExists := field.Tag.Lookup(path.TagDefault)
 			required := field.Tag.Get(path.TagRequired) == "true"
 			if name == "" {
@@ -745,12 +800,19 @@ func (proc *processor) makeObjectSchema(topName string, t reflect.Type, in strin
 					Ref: refComponentsSchemas + topName,
 				}
 			default:
+				var enumItems []any
+				enum, enumExists := field.Tag.Lookup(path.TagEnum)
+				if enumExists {
+					enumItems = makeEnum(enum)
+				}
+
 				s = &oa.SchemaRef{
 					Value: &oa.Schema{
 						Description: descr,
 						Type:        tp,
 						Format:      format,
 						Properties:  make(oa.Schemas),
+						Enum:        enumItems,
 					},
 				}
 				if defExists {
@@ -808,6 +870,17 @@ func (proc *processor) scanObject(parentList *misc.BoolMap, parent *oa.SchemaRef
 
 	(*parentList)[tName] = true
 	defer delete(*parentList, tName)
+
+	v := reflect.New(t)
+	m := v.MethodByName(TuneTypeFuncName)
+	if m.Kind() == reflect.Func {
+		res := m.Call(nil)
+		if len(res) == 1 && res[0].Kind() == reflect.Interface {
+			if tuned, ok := res[0].Interface().(reflect.Type); ok {
+				t = tuned
+			}
+		}
+	}
 
 	srcT := t
 
@@ -991,6 +1064,24 @@ func conv(tp string, v string) (any, error) {
 		return v, nil
 
 	}
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func makeEnum(s string) (enumItems []any) {
+	if s == "" {
+		return
+	}
+
+	if strings.Contains(s, "|") {
+		list := strings.Split(s, "|")
+		enumItems = make([]any, len(list))
+		for i, v := range list {
+			enumItems[i] = v
+		}
+	}
+
+	return
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//

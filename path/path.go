@@ -111,6 +111,7 @@ const (
 	TagRole     = "role"
 	TagRef      = "ref"
 	TagDefault  = "default"
+	TagEnum     = "enum"
 
 	RolePrimary     = "primary"
 	RoleKey         = "key"

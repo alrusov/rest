@@ -62,6 +62,25 @@ func ModuleRegistration(handler API) (err error) {
 	}
 	url = misc.NormalizeSlashes(url)
 
+	if len(info.Tags) == 0 {
+		ss := strings.Split(url, "/")
+		b := strings.Trim(base, "/")
+		for _, s := range ss {
+			if s != "" && s != b {
+				info.Tags = []string{s}
+				break
+			}
+		}
+	}
+
+	for i, tag := range info.Tags {
+		tag = GetTagName(tag)
+		if tag != "" {
+			info.Tags[i] = tag
+			break
+		}
+	}
+
 	err = loadEndpointConfig(relURL, info)
 	if err != nil {
 		return
