@@ -57,12 +57,6 @@ func (proc *ProcOptions) rest() (result any, code int, err error) {
 
 // Get -- получить данные
 func (proc *ProcOptions) Get() (result any, code int, err error) {
-	srcTp := proc.Chain.Parent.SrcResponseType
-	if srcTp == nil {
-		srcTp = proc.Chain.Parent.ResponseType
-	}
-	proc.DBqueryResult = reflect.New(reflect.SliceOf(srcTp)).Interface()
-
 	result, code, err = proc.before()
 	if err != nil {
 		if code == 0 {
@@ -80,7 +74,7 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 
 	compressionNeeded := false
 
-	if len(proc.Fields) != 0 { // В стардартном случае должно быть 0 или 1
+	if len(proc.Fields) != 0 { // В стандартном случае должно быть 0 или 1
 		src := proc.Chain.Parent.DBFields.AllSrc()
 
 		for i, name := range src {
@@ -136,21 +130,36 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 		db.Subst(db.SubstJbFields, proc.Chain.Parent.DBFields.JbSelectStr()),
 	)
 
-	err = db.Query(proc.Info.DBtype, proc.DBqueryResult, proc.DBqueryName, fields, proc.DBqueryVars)
-	if err != nil {
-		code = http.StatusInternalServerError
-		return
-	}
-
-	result, code, err = proc.after()
-	if err != nil {
-		if code == 0 {
-			code = http.StatusBadRequest
+	for {
+		srcTp := proc.Chain.Parent.SrcResponseType
+		if srcTp == nil {
+			srcTp = proc.Chain.Parent.ResponseType
 		}
-		return
-	}
-	if code != 0 || result != nil {
-		return
+		proc.DBqueryResult = reflect.New(reflect.SliceOf(srcTp)).Interface()
+
+		err = db.Query(proc.Info.DBtype, proc.DBqueryResult, proc.DBqueryName, fields, proc.DBqueryVars)
+		if err != nil {
+			code = http.StatusInternalServerError
+			return
+		}
+
+		result, code, err = proc.after()
+		if err != nil {
+			if code == 0 {
+				code = http.StatusBadRequest
+			}
+			return
+		}
+
+		if code == StatusRetry {
+			continue
+		}
+
+		if code != 0 || result != nil {
+			return
+		}
+
+		break
 	}
 
 	if proc.Chain.Parent.Flags&path.FlagResponseIsNotArray != 0 {

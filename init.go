@@ -224,12 +224,14 @@ func Start() (err error) {
 func lookingForUnusedConfigs() (err error) {
 	msgs := misc.NewMessages()
 
-	notProcessedTp := reflect.ValueOf(map[string]any{}).Type()
+	if !misc.TEST {
+		notProcessedTp := reflect.ValueOf(map[string]any{}).Type()
 
-	for name, c := range configs {
-		v := reflect.ValueOf(c)
-		if notProcessedTp == v.Type() {
-			msgs.Add(`api.configs contains data for unknown endpoint "%s" (%v)`, name, v)
+		for name, c := range configs {
+			v := reflect.ValueOf(c)
+			if notProcessedTp == v.Type() {
+				msgs.Add(`api.configs contains data for unknown endpoint "%s" (%v)`, name, v)
+			}
 		}
 	}
 
