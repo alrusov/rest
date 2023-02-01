@@ -538,7 +538,12 @@ func (chains *Chains) typeFlatModelIterator(base string, model *misc.StringMap, 
 			fName = base + "." + fName
 		}
 
-		switch f.Type.Kind() {
+		ft := f.Type
+		if ft.Kind() == reflect.Pointer {
+			ft = ft.Elem()
+		}
+
+		switch ft.Kind() {
 		case reflect.Slice, reflect.Array,
 			reflect.Invalid, reflect.Chan, reflect.Func, reflect.Map:
 			err = fmt.Errorf("unsupported type %s", f.Type.String())

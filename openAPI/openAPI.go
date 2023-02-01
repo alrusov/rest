@@ -172,7 +172,7 @@ func (proc *processor) prepare() (err error) {
 
 	proc.result = &oa.T{
 		OpenAPI:    oaCfg.APIversion,
-		Components: oa.Components{Schemas: make(oa.Schemas)},
+		Components: &oa.Components{Schemas: make(oa.Schemas)},
 		Info: &oa.Info{
 			Title:          oaCfg.Title,
 			Description:    oaCfg.Description,
@@ -975,7 +975,7 @@ func (proc *processor) scanObject(parentList *misc.BoolMap, parent *oa.SchemaRef
 				}
 				if me.Value.Type == "map" {
 					me.Value.Type = "object"
-					me.Value.AdditionalProperties = me.Value.Items
+					me.Value.AdditionalProperties.Schema = me.Value.Items
 					me.Value.Items = nil
 				}
 			}

@@ -68,14 +68,14 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 		return
 	}
 
-	f := proc.Chain.Parent.DBFields.All()
+	f := proc.Chain.Parent.DBFields.AllDbSelect()
 	fields := make([]string, len(f))
 	copy(fields, f)
 
 	compressionNeeded := false
 
 	if len(proc.Fields) != 0 { // В стандартном случае должно быть 0 или 1
-		src := proc.Chain.Parent.DBFields.AllSrc()
+		src := proc.Chain.Parent.DBFields.AllDbNames()
 
 		for i, name := range src {
 			if _, exists := proc.Fields[0][name]; !exists {
@@ -86,7 +86,7 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 	}
 
 	if proc.ExcludedFields != nil {
-		src := proc.Chain.Parent.DBFields.AllSrc()
+		src := proc.Chain.Parent.DBFields.AllDbNames()
 
 		for i, name := range src {
 			if fields[i] == "" {
@@ -127,7 +127,7 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 	}
 
 	proc.DBqueryVars = append(proc.DBqueryVars,
-		db.Subst(db.SubstJbFields, proc.Chain.Parent.DBFields.JbSelectStr()),
+		db.Subst(db.SubstJbFields, proc.Chain.Parent.DBFields.JbFieldsStr()),
 	)
 
 	for {
