@@ -4,12 +4,12 @@ go 1.19
 
 require (
 	github.com/alrusov/config v0.1.50
-	github.com/alrusov/db v0.1.19
+	github.com/alrusov/db v0.1.20
 	github.com/alrusov/jsonw v0.1.3
 	github.com/alrusov/log v0.1.34
-	github.com/alrusov/misc v1.1.5
+	github.com/alrusov/misc v1.1.6
 	github.com/alrusov/stdhttp v0.1.109
-	github.com/getkin/kin-openapi v0.113.0
+	github.com/getkin/kin-openapi v0.114.0
 )
 
 require (

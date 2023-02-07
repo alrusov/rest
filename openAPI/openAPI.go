@@ -55,7 +55,7 @@ type (
 		msgs    *misc.Messages
 	}
 
-	filler func(parent *oa.SchemaRef, field *reflect.StructField, tp string, format string) *oa.SchemaRef
+	filler func(parent *oa.SchemaRef, field *reflect.StructField, tp string, oaTp string, format string) *oa.SchemaRef
 
 	TuneType func() reflect.Type
 )
@@ -609,7 +609,7 @@ func (proc *processor) makePathParameters(urlPath string, chain *path.Chain) (fu
 
 		sample := field.Tag.Get(path.TagSample)
 		if sample != "" {
-			tokenDescr = fmt.Sprintf("%s. Пример: %s", tokenDescr, sample)
+			tokenDescr = fmt.Sprintf("%s. Example: %s", tokenDescr, sample)
 		}
 
 		if tp == "" {
@@ -619,6 +619,13 @@ func (proc *processor) makePathParameters(urlPath string, chain *path.Chain) (fu
 
 		pathElems = append(pathElems, "{"+token.VarName+"}")
 
+		oaTp := field.Tag.Get(path.TagOAtype)
+		if oaTp == "" {
+			oaTp = tp
+		} else {
+			format = field.Tag.Get(path.TagOAformat)
+		}
+
 		pathParams = append(pathParams,
 			&oa.Parameter{
 				Name:        token.VarName,
@@ -627,7 +634,7 @@ func (proc *processor) makePathParameters(urlPath string, chain *path.Chain) (fu
 				Required:    true,
 				Schema: &oa.SchemaRef{
 					Value: &oa.Schema{
-						Type:   tp,
+						Type:   oaTp,
 						Format: format,
 						Enum:   enumItems,
 					},
@@ -670,7 +677,7 @@ func (proc *processor) makeParameters(t reflect.Type, in string) (pp []*oa.Param
 	pp = make([]*oa.Parameter, 0, 32)
 
 	err = proc.scanObject(&misc.BoolMap{}, nil, t, in,
-		func(_ *oa.SchemaRef, field *reflect.StructField, tp string, format string) *oa.SchemaRef {
+		func(_ *oa.SchemaRef, field *reflect.StructField, tp string, oaTp string, format string) *oa.SchemaRef {
 			switch tp {
 			case "array", "object":
 				// Параметры плоские
@@ -703,7 +710,7 @@ func (proc *processor) makeParameters(t reflect.Type, in string) (pp []*oa.Param
 				Required:    required,
 				Schema: &oa.SchemaRef{
 					Value: &oa.Schema{
-						Type:   tp,
+						Type:   oaTp,
 						Format: format,
 						Enum:   enumItems,
 					},
@@ -739,7 +746,7 @@ func (proc *processor) makeObjectSchema(topName string, t reflect.Type, in strin
 	}
 
 	err = proc.scanObject(&misc.BoolMap{}, schemaRef, t, in,
-		func(parent *oa.SchemaRef, field *reflect.StructField, tp string, format string) *oa.SchemaRef {
+		func(parent *oa.SchemaRef, field *reflect.StructField, tp string, oaTp string, format string) *oa.SchemaRef {
 			if field == nil { // array member
 				var s *oa.SchemaRef
 				switch tp {
@@ -864,7 +871,7 @@ func (proc *processor) scanObject(parentList *misc.BoolMap, parent *oa.SchemaRef
 	tName := t.String()
 	if _, exists := (*parentList)[tName]; exists {
 		// Циклическая структура
-		filler(parent, nil, "$", tName)
+		filler(parent, nil, "$", "", tName)
 		return
 	}
 
@@ -923,7 +930,14 @@ func (proc *processor) scanObject(parentList *misc.BoolMap, parent *oa.SchemaRef
 
 		d, exists := specialTypes[fType.String()]
 		if exists {
-			filler(parent, &field, d.tp, d.format)
+			oaTp := field.Tag.Get(path.TagOAtype)
+			if oaTp == "" {
+				oaTp = d.tp
+			} else {
+				d.format = field.Tag.Get(path.TagOAformat)
+			}
+
+			filler(parent, &field, d.tp, oaTp, d.format)
 			continue
 		}
 
@@ -935,10 +949,10 @@ func (proc *processor) scanObject(parentList *misc.BoolMap, parent *oa.SchemaRef
 
 		switch kind {
 		case reflect.Interface:
-			filler(parent, &field, "", "")
+			filler(parent, &field, "", "", "")
 
 		case reflect.Struct:
-			me := filler(parent, &field, "", "")
+			me := filler(parent, &field, "", "", "")
 			if me != nil {
 				e := proc.scanObject(parentList, me, fType, in, filler)
 				if e != nil {
@@ -950,11 +964,19 @@ func (proc *processor) scanObject(parentList *misc.BoolMap, parent *oa.SchemaRef
 		case reflect.Map:
 			fallthrough
 		case reflect.Slice:
-			me := filler(parent, &field, tp, format)
+			oaTp := field.Tag.Get(path.TagOAtype)
+			if oaTp == "" {
+				oaTp = tp
+
+			} else {
+				format = field.Tag.Get(path.TagOAformat)
+			}
+
+			me := filler(parent, &field, tp, oaTp, format)
 			if me != nil {
 				ref := field.Tag.Get(path.TagRef)
 				if ref != "" {
-					filler(me, nil, "ref", ref)
+					filler(me, nil, "ref", "", ref)
 				} else {
 					elem := fType.Elem()
 					kind, tp, format, e := proc.entityType(elem)
@@ -963,7 +985,7 @@ func (proc *processor) scanObject(parentList *misc.BoolMap, parent *oa.SchemaRef
 						return
 					}
 
-					elemRef := filler(me, nil, tp, format)
+					elemRef := filler(me, nil, tp, oaTp, format)
 
 					if kind == reflect.Struct {
 						e := proc.scanObject(parentList, elemRef, elem, in, filler)
@@ -985,7 +1007,14 @@ func (proc *processor) scanObject(parentList *misc.BoolMap, parent *oa.SchemaRef
 				tp = "UNKNOWN_" + fType.String()
 			}
 
-			filler(parent, &field, tp, format)
+			oaTp := field.Tag.Get(path.TagOAtype)
+			if oaTp == "" {
+				oaTp = tp
+			} else {
+				format = field.Tag.Get(path.TagOAformat)
+			}
+
+			filler(parent, &field, tp, oaTp, format)
 		}
 	}
 

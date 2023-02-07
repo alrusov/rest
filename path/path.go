@@ -112,6 +112,8 @@ const (
 	TagRef      = "ref"
 	TagDefault  = "default"
 	TagEnum     = "enum"
+	TagOAtype   = "oaType"
+	TagOAformat = "oaFormat"
 
 	RolePrimary     = "primary"
 	RoleKey         = "key"
