@@ -46,6 +46,7 @@ type (
 		RequestPattern         any            `json:"request"`
 		RequestType            reflect.Type   `json:"-"`
 		RequestFlatModel       misc.StringMap `json:"-"`                      // ключ - путь до поля, значение - его tag db
+		RequestRequiredFields  misc.StringMap `json:"-"`                      // обязательные поля, значение - его tag db
 		RequestUniqueKeyFields []string       `json:"requestUniqueKeyFields"` // уникальные поля, первый - primary key (формально)
 
 		ResponseObjectName  string       `json:"responseObjectName"`
@@ -213,6 +214,10 @@ func (chains *Chains) Prepare(m string) (err error) {
 
 	if len(chains.RequestUniqueKeyFields) == 0 {
 		chains.RequestUniqueKeyFields = make([]string, 1, 16) // [0] это primary key
+	}
+
+	if len(chains.RequestRequiredFields) == 0 {
+		chains.RequestRequiredFields = make(misc.StringMap, 16)
 	}
 
 	if chains.RequestPattern != nil {
@@ -502,7 +507,7 @@ var (
 )
 
 func (chains *Chains) makeTypeFlatModel() (err error) {
-	chains.RequestFlatModel = make(misc.StringMap, 32)
+	chains.RequestFlatModel = make(misc.StringMap, 64)
 
 	err = chains.typeFlatModelIterator("", &chains.RequestFlatModel, chains.RequestType)
 	if err != nil {
@@ -576,6 +581,11 @@ func (chains *Chains) typeFlatModelIterator(base string, model *misc.StringMap, 
 			if f.Tag.Get(TagRole) == RoleKey {
 				chains.RequestUniqueKeyFields = append(chains.RequestUniqueKeyFields, fName)
 			}
+
+			if misc.StructFieldName(&f, TagRequired) == "true" {
+				chains.RequestRequiredFields[fName] = dbName
+			}
+
 		}
 	}
 

@@ -1,10 +1,10 @@
 module github.com/alrusov/rest/v2
 
-go 1.19
+go 1.20
 
 require (
 	github.com/alrusov/config v0.1.50
-	github.com/alrusov/db v0.1.20
+	github.com/alrusov/db v0.1.21
 	github.com/alrusov/jsonw v0.1.3
 	github.com/alrusov/log v0.1.34
 	github.com/alrusov/misc v1.1.6
