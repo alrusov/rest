@@ -216,29 +216,58 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 
 	// Check fields
 	if len(proc.Fields) > 0 {
-		if forUpdate {
-			// Update: For key fields
-			proc.Fields = proc.Fields[0:1] // Для Update должен быть только один блок
+		var lacks []string
+		var uniqCounts misc.IntMap
 
-			for i, f := range proc.Chain.Parent.RequestUniqueKeyFields {
-				if _, exists := proc.Fields[0][f]; exists {
-					delete(proc.Fields[0], f)
-					tp := ""
-					if i == 0 {
-						tp = "primary "
+		rqLn := len(proc.Chain.Parent.RequestRequiredFields)
+		if rqLn > 0 {
+			lacks = make([]string, 0, rqLn)
+			uniqCounts = make(misc.IntMap, rqLn)
+
+			ln := len(proc.Fields)
+			for _, f := range proc.Chain.Parent.RequestRequiredFields {
+				uniqCounts[f] = ln
+			}
+		}
+
+		if forUpdate {
+			// Update: check a key fields & empty required string fields
+
+			if len(proc.Fields) > 1 {
+				err = fmt.Errorf("%d records updated, expected 1", len(proc.Fields))
+				return
+			}
+
+			proc.Fields = proc.Fields[0:1]
+			fields := proc.Fields[0]
+
+			for f := range uniqCounts {
+				v, exists := fields[f]
+				if !exists {
+					continue
+				}
+
+				vv := reflect.ValueOf(v)
+				if vv.Kind() == reflect.String && vv.IsZero() {
+					lacks = append(lacks, f) // empty string for a required field
+				}
+			}
+
+			if len(lacks) == 0 {
+				for i, f := range proc.Chain.Parent.RequestUniqueKeyFields {
+					if _, exists := fields[f]; exists {
+						delete(fields, f)
+						tp := ""
+						if i == 0 {
+							tp = "primary "
+						}
+						proc.Notices.Add(`%skey field "%s" ignored`, tp, f)
 					}
-					proc.Notices.Add(`%skey field "%s" ignored`, tp, f)
 				}
 			}
 		} else {
-			// Insert: For required fields
-			if len(proc.Chain.Parent.RequestRequiredFields) != 0 {
-				uniqCounts := make(misc.IntMap, len(proc.Chain.Parent.RequestRequiredFields))
-				ln := len(proc.Fields)
-				for _, f := range proc.Chain.Parent.RequestRequiredFields {
-					uniqCounts[f] = ln
-				}
-
+			// Insert: check a required fields
+			if rqLn > 0 {
 				for _, fields := range proc.Fields {
 					for f, n := range uniqCounts {
 						v, exists := fields[f]
@@ -255,19 +284,17 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 					}
 				}
 
-				lacks := make([]string, 0, len(uniqCounts))
-
 				for f, n := range uniqCounts {
 					if n != 0 {
 						lacks = append(lacks, f)
 					}
 				}
-
-				if len(lacks) != 0 {
-					err = fmt.Errorf("empty fields: %s", strings.Join(lacks, ", "))
-					return
-				}
 			}
+		}
+
+		if len(lacks) != 0 {
+			err = fmt.Errorf("empty fields: %s", strings.Join(lacks, ", "))
+			return
 		}
 	}
 
