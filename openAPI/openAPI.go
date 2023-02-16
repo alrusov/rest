@@ -640,7 +640,7 @@ func (proc *processor) makePathParameters(urlPath string, chain *path.Chain) (fu
 			},
 		}
 		if sample != "" {
-			p.Schema.Value.Example = sample
+			//p.Schema.Value.Example = sample
 		}
 
 		pathParams = append(pathParams, p)
@@ -720,7 +720,7 @@ func (proc *processor) makeParameters(t reflect.Type, in string) (pp []*oa.Param
 				},
 			}
 			if sample != "" {
-				p.Schema.Value.Example = sample
+				//p.Schema.Value.Example = sample
 			}
 
 			defVal, defExists := field.Tag.Lookup(path.TagDefault)
@@ -829,7 +829,7 @@ func (proc *processor) makeObjectSchema(topName string, t reflect.Type, in strin
 					},
 				}
 				if sample != "" {
-					s.Value.Example = sample
+					//s.Value.Example = sample
 				}
 
 				if defExists {
