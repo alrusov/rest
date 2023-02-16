@@ -585,7 +585,7 @@ func (proc *processor) makePathParameters(urlPath string, chain *path.Chain) (fu
 			continue
 		}
 
-		enumItems := makeEnum(token.Expr)
+		enumItems := makeEnum(token.Expr, "|")
 
 		field, exists := chain.Parent.PathParamsType.FieldByName(token.VarName)
 		if !exists {
@@ -626,21 +626,24 @@ func (proc *processor) makePathParameters(urlPath string, chain *path.Chain) (fu
 			format = field.Tag.Get(path.TagOAformat)
 		}
 
-		pathParams = append(pathParams,
-			&oa.Parameter{
-				Name:        token.VarName,
-				In:          "path",
-				Description: tokenDescr,
-				Required:    true,
-				Schema: &oa.SchemaRef{
-					Value: &oa.Schema{
-						Type:   oaTp,
-						Format: format,
-						Enum:   enumItems,
-					},
+		p := &oa.Parameter{
+			Name:        token.VarName,
+			In:          "path",
+			Description: tokenDescr,
+			Required:    true,
+			Schema: &oa.SchemaRef{
+				Value: &oa.Schema{
+					Type:   oaTp,
+					Format: format,
+					Enum:   enumItems,
 				},
 			},
-		)
+		}
+		if sample != "" {
+			p.Schema.Value.Example = sample
+		}
+
+		pathParams = append(pathParams, p)
 	}
 
 	fullPath = strings.Join(append([]string{urlPath}, pathElems...), "/")
@@ -692,13 +695,13 @@ func (proc *processor) makeParameters(t reflect.Type, in string) (pp []*oa.Param
 			descr := field.Tag.Get(path.TagComment)
 			sample := field.Tag.Get(path.TagSample)
 			if sample != "" {
-				descr = fmt.Sprintf("%s. Пример: %s", descr, sample)
+				descr = fmt.Sprintf("%s. Example: %s", descr, sample)
 			}
 
 			var enumItems []any
 			enum, enumExists := field.Tag.Lookup(path.TagEnum)
 			if enumExists {
-				enumItems = makeEnum(enum)
+				enumItems = makeEnum(enum, ",")
 			}
 
 			required := field.Tag.Get(path.TagRequired) == "true"
@@ -715,6 +718,9 @@ func (proc *processor) makeParameters(t reflect.Type, in string) (pp []*oa.Param
 						Enum:   enumItems,
 					},
 				},
+			}
+			if sample != "" {
+				p.Schema.Value.Example = sample
 			}
 
 			defVal, defExists := field.Tag.Lookup(path.TagDefault)
@@ -781,7 +787,7 @@ func (proc *processor) makeObjectSchema(topName string, t reflect.Type, in strin
 			descr := field.Tag.Get(path.TagComment)
 			sample := field.Tag.Get(path.TagSample)
 			if sample != "" {
-				descr = fmt.Sprintf("%s. Пример: %s", descr, sample)
+				descr = fmt.Sprintf("%s. Example: %s", descr, sample)
 			}
 
 			defVal, defExists := field.Tag.Lookup(path.TagDefault)
@@ -810,7 +816,7 @@ func (proc *processor) makeObjectSchema(topName string, t reflect.Type, in strin
 				var enumItems []any
 				enum, enumExists := field.Tag.Lookup(path.TagEnum)
 				if enumExists {
-					enumItems = makeEnum(enum)
+					enumItems = makeEnum(enum, ",")
 				}
 
 				s = &oa.SchemaRef{
@@ -822,6 +828,10 @@ func (proc *processor) makeObjectSchema(topName string, t reflect.Type, in strin
 						Enum:        enumItems,
 					},
 				}
+				if sample != "" {
+					s.Value.Example = sample
+				}
+
 				if defExists {
 					s.Value.Default, err = conv(tp, defVal)
 					if err != nil {
@@ -1097,17 +1107,15 @@ func conv(tp string, v string) (any, error) {
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-func makeEnum(s string) (enumItems []any) {
-	if s == "" {
+func makeEnum(s string, dlm string) (enumItems []any) {
+	if s == "" || !strings.Contains(s, dlm) {
 		return
 	}
 
-	if strings.Contains(s, "|") {
-		list := strings.Split(s, "|")
-		enumItems = make([]any, len(list))
-		for i, v := range list {
-			enumItems[i] = v
-		}
+	list := strings.Split(s, dlm)
+	enumItems = make([]any, len(list))
+	for i, v := range list {
+		enumItems[i] = strings.TrimSpace(v)
 	}
 
 	return
