@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/alrusov/config"
+	"github.com/alrusov/db"
 	"github.com/alrusov/log"
 	"github.com/alrusov/misc"
 	path "github.com/alrusov/rest/v2/path"
@@ -260,6 +261,22 @@ func GetTagName(name string) string {
 	}
 
 	return tag.Name
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func FindSubstArg(vars []any, name string) (subst *db.SubstArg) {
+	for _, v := range vars {
+		switch vv := v.(type) {
+		case *db.SubstArg:
+			if vv.Name() == name {
+				subst = vv
+				return
+			}
+		}
+	}
+
+	return
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//
