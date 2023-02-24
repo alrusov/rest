@@ -347,6 +347,12 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 		n := startIdx + len(fieldNames)
 		for _, f := range jbPairs {
 			f.Idx += n
+
+			if forUpdate {
+				if s, exists := f.FieldInfo.Tags["update"]; exists {
+					f.Format = strings.ReplaceAll(s, "#", ",")
+				}
+			}
 		}
 	}
 
