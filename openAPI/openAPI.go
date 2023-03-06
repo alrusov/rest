@@ -874,6 +874,7 @@ var (
 		reflect.TypeOf(db.NullUint64{}).String():  {"integer", "int64"},
 		reflect.TypeOf(db.NullString{}).String():  {"string", ""},
 		reflect.TypeOf(db.NullTime{}).String():    {"string", "date-time"},
+		reflect.TypeOf(db.Duration(0)).String():   {"string", ""},
 	}
 )
 
