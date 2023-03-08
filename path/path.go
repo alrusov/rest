@@ -531,12 +531,12 @@ func (chains *Chains) typeFlatModelIterator(base string, model *misc.StringMap, 
 			continue
 		}
 
-		dbName := misc.StructFieldName(&f, TagDB)
+		dbName := misc.StructTagName(&f, TagDB)
 		if dbName == "-" {
 			continue
 		}
 
-		fName := misc.StructFieldName(&f, TagJSON)
+		fName := misc.StructTagName(&f, TagJSON)
 		if fName == "-" {
 			fName = f.Name
 		}
@@ -582,7 +582,7 @@ func (chains *Chains) typeFlatModelIterator(base string, model *misc.StringMap, 
 				chains.RequestUniqueKeyFields = append(chains.RequestUniqueKeyFields, fName)
 			}
 
-			if misc.StructFieldName(&f, TagRequired) == "true" {
+			if misc.StructTagName(&f, TagRequired) == "true" {
 				chains.RequestRequiredFields[fName] = dbName
 			}
 

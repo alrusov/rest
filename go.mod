@@ -4,10 +4,10 @@ go 1.20
 
 require (
 	github.com/alrusov/config v0.1.50
-	github.com/alrusov/db v0.1.24
+	github.com/alrusov/db v0.1.25
 	github.com/alrusov/jsonw v0.1.3
 	github.com/alrusov/log v0.1.36
-	github.com/alrusov/misc v1.1.6
+	github.com/alrusov/misc v1.1.7
 	github.com/alrusov/stdhttp v0.1.109
 	github.com/getkin/kin-openapi v0.114.0
 )

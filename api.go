@@ -233,7 +233,7 @@ func (proc *ProcOptions) reply(code int, result any, err error) {
 		var ok bool
 		data, ok = result.([]byte)
 		if !ok {
-			msg := fmt.Sprintf("resilt is %T, expected %T", result, data)
+			msg := fmt.Sprintf("result is %T, expected %T", result, data)
 			stdhttp.Error(proc.ID, false, proc.W, proc.R, code, msg, nil)
 			return
 		}
@@ -305,7 +305,7 @@ func (proc *ProcOptions) parseQueryParams(src url.Values) (err error) {
 
 		// Имя поля для JSON
 		name := fieldT.Name
-		fieldName := misc.StructFieldName(&fieldT, path.TagJSON)
+		fieldName := misc.StructTagName(&fieldT, path.TagJSON)
 		if fieldName == "-" {
 			continue
 		}

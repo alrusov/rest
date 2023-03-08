@@ -687,7 +687,7 @@ func (proc *processor) makeParameters(t reflect.Type, in string) (pp []*oa.Param
 				return nil
 			}
 
-			name := misc.StructFieldName(field, path.TagJSON)
+			name := misc.StructTagName(field, path.TagJSON)
 			if name == "-" {
 				return nil
 			}
@@ -779,7 +779,7 @@ func (proc *processor) makeObjectSchema(topName string, t reflect.Type, in strin
 				return s
 			}
 
-			name := misc.StructFieldName(field, path.TagJSON)
+			name := misc.StructTagName(field, path.TagJSON)
 			if name == "-" {
 				return nil
 			}
@@ -930,7 +930,7 @@ func (proc *processor) scanObject(parentList *misc.BoolMap, parent *oa.SchemaRef
 			continue
 		}
 
-		if misc.StructFieldName(&field, path.TagJSON) == "-" {
+		if misc.StructTagName(&field, path.TagJSON) == "-" {
 			continue
 		}
 

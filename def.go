@@ -26,16 +26,14 @@ type (
 		// Получение информации о методе
 		Info() *Info
 
-		// Возврат (code<0 && err!=nil) -- отсылается ответ с ошибкой в json и кодом abs(code), даже если не стоит FlagJSONReply
-		// Если code==0, то result содержит готовый ответ в []byte, отсылаем как есть с кодом 200
-		//Handler(options *ExecOptions) (result any, code int, headers misc.StringMap, err error)
-
 		// Вызывается перед обращением к базе, используется, например, для добавления дополнительных параметров или проверок
-		// Если возвращает code != 0 или data != nil, то они и будут результатом
+		// Если возвращает code != 0 или result != nil, то они и будут результатом
+		// Если code<0, то result содержит готовый ответ в []byte, отсылаем как есть с кодом -code
 		Before(proc *ProcOptions) (result any, code int, err error)
 
 		// Вызывается почле обращения к базе, используется, например, для обогащения результата
-		// Если возвращает code != 0 или data != nil, то они и будут результатом
+		// Если возвращает code != 0 или result != nil, то они и будут результатом
+		// Если code<0, то result содержит готовый ответ в []byte, отсылаем как есть с кодом -code
 		After(proc *ProcOptions) (result any, code int, err error)
 	}
 

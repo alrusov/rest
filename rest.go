@@ -528,7 +528,7 @@ func (info *Info) makeParamsDescription() (err error) {
 			for i := 0; i < ln; i++ {
 				fieldT := t.Field(i)
 
-				name := misc.StructFieldName(&fieldT, path.TagJSON)
+				name := misc.StructTagName(&fieldT, path.TagJSON)
 				if name == "-" {
 					continue
 				}
