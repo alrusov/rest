@@ -90,6 +90,7 @@ func Handler(h *stdhttp.HTTP, id uint64, prefix string, urlPath string, w http.R
 		case stdhttp.ContentTypeJSON:
 			err = jsonw.Unmarshal(proc.RawBody, &proc.RequestParams)
 			if err != nil {
+				code = http.StatusBadRequest
 				proc.reply(code, result, err)
 				return
 			}
@@ -99,6 +100,7 @@ func Handler(h *stdhttp.HTTP, id uint64, prefix string, urlPath string, w http.R
 	// Парсим query параметры
 	err = proc.parseQueryParams(r.URL.Query())
 	if err != nil {
+		code = http.StatusBadRequest
 		proc.reply(code, result, err)
 		return
 	}
