@@ -963,12 +963,21 @@ func (proc *processor) scanObject(parentList *misc.BoolMap, parent *oa.SchemaRef
 			filler(parent, &field, "", "", "")
 
 		case reflect.Struct:
-			me := filler(parent, &field, "", "", "")
+			me := parent
+			if !field.Anonymous {
+				me = filler(parent, &field, "", "", "")
+			}
+
 			if me != nil {
-				e := proc.scanObject(parentList, me, fType, in, filler)
-				if e != nil {
-					err = e
-					return
+				ref := field.Tag.Get(path.TagRef)
+				if ref != "" {
+					filler(me, nil, "ref", "", ref)
+				} else {
+					e := proc.scanObject(parentList, me, fType, in, filler)
+					if e != nil {
+						err = e
+						return
+					}
 				}
 			}
 
