@@ -307,7 +307,7 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 	}
 
 	if len(proc.Fields) == 0 || len(proc.Fields[0]) == 0 {
-		proc.Notices.Add("no fields")
+		proc.Notices.Add("no valid data to save")
 		result = res
 		return
 	}
