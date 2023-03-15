@@ -541,8 +541,16 @@ func (chains *Chains) typeFlatModelIterator(base string, model *misc.StringMap, 
 			fName = f.Name
 		}
 
+		if f.Anonymous {
+			fName = ""
+		}
+
 		if base != "" {
-			fName = base + "." + fName
+			if fName == "" {
+				fName = base
+			} else {
+				fName = base + "." + fName
+			}
 		}
 
 		ft := f.Type
