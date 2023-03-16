@@ -39,10 +39,11 @@ type (
 
 		Version string `toml:"version"`
 
-		Server   string `toml:"server"`
-		Protocol string `toml:"protocol"`
-		Host     string `toml:"host"`
-		Port     uint   `toml:"port"`
+		Server       string   `toml:"server"`
+		ExtraServers []string `toml:"extra-servers"`
+		Protocol     string   `toml:"protocol"`
+		Host         string   `toml:"host"`
+		Port         uint     `toml:"port"`
 	}
 
 	processor struct {
@@ -166,8 +167,22 @@ func (proc *processor) prepare() (err error) {
 		return
 	}
 
-	server := &oa.Server{
+	servers := make(oa.Servers, 1, 1+len(proc.oaCfg.ExtraServers))
+	servers[0] = &oa.Server{
 		URL: url,
+	}
+
+	for _, url := range proc.oaCfg.ExtraServers {
+		url = strings.TrimSpace(url)
+		if url == "" {
+			continue
+		}
+
+		servers = append(servers,
+			&oa.Server{
+				URL: url,
+			},
+		)
 	}
 
 	proc.result = &oa.T{
@@ -190,10 +205,7 @@ func (proc *processor) prepare() (err error) {
 		},
 		Paths:    oa.Paths{},
 		Security: *oa.NewSecurityRequirements(),
-		Servers: oa.Servers{
-			server,
-		},
-
+		Servers:  servers,
 		//ExternalDocs: &oa.ExternalDocs{},
 	}
 
