@@ -300,28 +300,9 @@ func (proc *ProcOptions) parseQueryParams(src url.Values) (err error) {
 	paramsT := proc.Chain.Parent.QueryParamsType
 	paramsV := reflect.ValueOf(proc.QueryParams).Elem()
 
-	nameMap := misc.StringMap{}
-	ln := paramsT.NumField()
-	for i := 0; i < ln; i++ {
-		fieldT := paramsT.Field(i)
+	nameMap := make(misc.StringMap, paramsT.NumField())
 
-		// Имя поля для JSON
-		name := fieldT.Name
-		fieldName := misc.StructTagName(&fieldT, path.TagJSON)
-		if fieldName == "-" {
-			continue
-		}
-
-		// Значение по умолчанию
-		defVal := fieldT.Tag.Get(path.TagDefault)
-		if defVal != "" {
-			if err := convert(defVal, paramsV.Field(i)); err != nil {
-				proc.LogFacility.Message(log.DEBUG, "[%d] parseQueryParams: %s", proc.ID, err)
-			}
-		}
-
-		nameMap[fieldName] = name
-	}
+	scanQueryParams(proc, paramsT, paramsV, nameMap)
 
 	msgs := misc.NewMessages()
 
@@ -361,6 +342,35 @@ func (proc *ProcOptions) parseQueryParams(src url.Values) (err error) {
 
 	err = msgs.Error()
 	return
+}
+
+func scanQueryParams(proc *ProcOptions, t reflect.Type, v reflect.Value, nameMap misc.StringMap) {
+	ln := t.NumField()
+	for i := 0; i < ln; i++ {
+		fieldT := t.Field(i)
+
+		if fieldT.Type.Kind() == reflect.Struct {
+			scanQueryParams(proc, fieldT.Type, v.Field(i), nameMap)
+			continue
+		}
+
+		// Имя поля для JSON
+		name := fieldT.Name
+		fieldName := misc.StructTagName(&fieldT, path.TagJSON)
+		if fieldName == "-" {
+			continue
+		}
+
+		// Значение по умолчанию
+		defVal := fieldT.Tag.Get(path.TagDefault)
+		if defVal != "" {
+			if err := convert(defVal, v.Field(i)); err != nil {
+				proc.LogFacility.Message(log.DEBUG, "[%d] parseQueryParams: %s", proc.ID, err)
+			}
+		}
+
+		nameMap[fieldName] = name
+	}
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//

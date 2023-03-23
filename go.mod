@@ -3,12 +3,12 @@ module github.com/alrusov/rest/v2
 go 1.20
 
 require (
-	github.com/alrusov/config v0.1.51
-	github.com/alrusov/db v0.1.27
+	github.com/alrusov/config v0.1.53
+	github.com/alrusov/db v0.1.28
 	github.com/alrusov/jsonw v0.1.3
 	github.com/alrusov/log v0.1.36
 	github.com/alrusov/misc v1.1.8
-	github.com/alrusov/stdhttp v0.1.110
+	github.com/alrusov/stdhttp v0.1.113
 	github.com/getkin/kin-openapi v0.115.0
 )
 
