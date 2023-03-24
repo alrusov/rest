@@ -61,31 +61,33 @@ type (
 
 	// Опции запроса к методу
 	ProcOptions struct {
-		handler        API                 // Интерфейс метода
-		LogFacility    *log.Facility       // Предпочтительная facility для логирования
-		H              *stdhttp.HTTP       // HTTP листенер
-		LogSrc         string              // Строка с ID запроса для MessageWithSource
-		Info           *Info               // Информация о методе
-		ID             uint64              // ID запроса
-		Prefix         string              // Префикс пути запроса (при работе через прокси)
-		Path           string              // Путь запроса
-		R              *http.Request       // Запрос
-		W              http.ResponseWriter // Интерфейс для ответа
-		Chain          *path.Chain         // Обрабатываемая цепочка
-		Scope          string              // Обрабатываемый Scope
-		RawBody        []byte              // Тело запроса. В R.Body уже nil!
-		PathParams     any                 // Path параметры
-		QueryParams    any                 // Query параметры
-		RequestParams  any                 // Request параметры
-		DBqueryName    string              // Имя запроса к базе данных
-		DBqueryVars    []any               // Переменные для формирования запроса
-		DBqueryResult  any                 // Результат выполненения запроса (слайс)
-		Fields         []misc.InterfaceMap // Поля (имя из sql запроса) для insert или update. Для select - список полей для выборки из базы, если нужны не все из объекта
-		ExcludedFields misc.InterfaceMap   // Поля (имя из sql запроса), которые надо исключить из запроса
-		Notices        *misc.Messages      // Предупреждения и замечания обработчика
-		ExecResult     *ExecResult         // Результат выполнения Exec
-		ExtraHeaders   misc.StringMap      // Дополнительные возвращаемые HTTP заголовки
-		Custom         any                 // Произвольные пользовательские данные
+		handler          API                 // Интерфейс метода
+		LogFacility      *log.Facility       // Предпочтительная facility для логирования
+		H                *stdhttp.HTTP       // HTTP листенер
+		LogSrc           string              // Строка с ID запроса для MessageWithSource
+		Info             *Info               // Информация о методе
+		ID               uint64              // ID запроса
+		Prefix           string              // Префикс пути запроса (при работе через прокси)
+		Path             string              // Путь запроса
+		R                *http.Request       // Запрос
+		W                http.ResponseWriter // Интерфейс для ответа
+		Chain            *path.Chain         // Обрабатываемая цепочка
+		ChainParentLocal path.Chains         // Копия Chain.Parent для возможности ее модификации для работы с динамическими объектами. Рекомендуется использовать её, а не Chain.Parent
+		Scope            string              // Обрабатываемый Scope
+		RawBody          []byte              // Тело запроса. В R.Body уже nil!
+		PathParams       any                 // Path параметры
+		QueryParams      any                 // Query параметры
+		RequestParams    any                 // Request параметры
+		DBqueryName      string              // Имя запроса к базе данных
+		DBqueryVars      []any               // Переменные для формирования запроса
+		DBqueryResult    any                 // Результат выполненения запроса (слайс)
+		Fields           []misc.InterfaceMap // Поля (имя из sql запроса) для insert или update. Для select - список полей для выборки из базы, если нужны не все из объекта
+		ExcludedFields   misc.InterfaceMap   // Поля (имя из sql запроса), которые надо исключить из запроса
+		Notices          *misc.Messages      // Предупреждения и замечания обработчика
+		ExecResult       *ExecResult         // Результат выполнения Exec
+		ExtraHeaders     misc.StringMap      // Дополнительные возвращаемые HTTP заголовки
+
+		Custom any // Произвольные пользовательские данные
 	}
 
 	// Обработчик

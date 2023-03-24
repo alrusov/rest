@@ -237,7 +237,7 @@ func (chains *Chains) Prepare(m string) (err error) {
 		}
 
 		if chains.Flags&FlagRequestDontMakeFlatModel == 0 {
-			err = chains.makeTypeFlatModel()
+			err = chains.MakeTypeFlatModel()
 			if err != nil {
 				msgs.Add("RequestPattern %s", err)
 				return
@@ -506,7 +506,7 @@ var (
 	}
 )
 
-func (chains *Chains) makeTypeFlatModel() (err error) {
+func (chains *Chains) MakeTypeFlatModel() (err error) {
 	chains.RequestFlatModel = make(misc.StringMap, 64)
 
 	err = chains.typeFlatModelIterator("", &chains.RequestFlatModel, chains.RequestType)

@@ -68,14 +68,14 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 		return
 	}
 
-	f := proc.Chain.Parent.DBFields.AllDbSelect()
+	f := proc.ChainParentLocal.DBFields.AllDbSelect()
 	fields := make([]string, len(f))
 	copy(fields, f)
 
 	compressionNeeded := false
 
 	if len(proc.Fields) != 0 { // В стандартном случае должно быть 0 или 1
-		src := proc.Chain.Parent.DBFields.AllDbNames()
+		src := proc.ChainParentLocal.DBFields.AllDbNames()
 
 		for i, name := range src {
 			if _, exists := proc.Fields[0][name]; !exists {
@@ -86,7 +86,7 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 	}
 
 	if proc.ExcludedFields != nil {
-		src := proc.Chain.Parent.DBFields.AllDbNames()
+		src := proc.ChainParentLocal.DBFields.AllDbNames()
 
 		for i, name := range src {
 			if fields[i] == "" {
@@ -127,13 +127,13 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 	}
 
 	proc.DBqueryVars = append(proc.DBqueryVars,
-		db.Subst(db.SubstJbFields, proc.Chain.Parent.DBFields.JbFieldsStr()),
+		db.Subst(db.SubstJbFields, proc.ChainParentLocal.DBFields.JbFieldsStr()),
 	)
 
 	for {
-		srcTp := proc.Chain.Parent.SrcResponseType
+		srcTp := proc.ChainParentLocal.SrcResponseType
 		if srcTp == nil {
-			srcTp = proc.Chain.Parent.ResponseType
+			srcTp = proc.ChainParentLocal.ResponseType
 		}
 		proc.DBqueryResult = reflect.New(reflect.SliceOf(srcTp)).Interface()
 
@@ -162,7 +162,7 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 		break
 	}
 
-	if proc.Chain.Parent.Flags&path.FlagResponseIsNotArray != 0 {
+	if proc.ChainParentLocal.Flags&path.FlagResponseIsNotArray != 0 {
 		v := reflect.ValueOf(proc.DBqueryResult).Elem()
 		if v.Len() == 0 {
 			code = http.StatusNoContent
@@ -195,8 +195,8 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 		res.Notice = proc.Notices.String()
 	}()
 
-	if proc.Chain.Parent.Flags&path.FlagRequestDontMakeFlatModel == 0 {
-		proc.Fields, err = proc.Chain.Parent.ExtractFieldsFromBody(proc.RawBody)
+	if proc.ChainParentLocal.Flags&path.FlagRequestDontMakeFlatModel == 0 {
+		proc.Fields, err = proc.ChainParentLocal.ExtractFieldsFromBody(proc.RawBody)
 		if err != nil {
 			return
 		}
@@ -219,13 +219,13 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 		var lacks []string
 		var uniqCounts misc.IntMap
 
-		rqLn := len(proc.Chain.Parent.RequestRequiredFields)
+		rqLn := len(proc.ChainParentLocal.RequestRequiredFields)
 		if rqLn > 0 {
 			lacks = make([]string, 0, rqLn)
 			uniqCounts = make(misc.IntMap, rqLn)
 
 			ln := len(proc.Fields)
-			for _, f := range proc.Chain.Parent.RequestRequiredFields {
+			for _, f := range proc.ChainParentLocal.RequestRequiredFields {
 				uniqCounts[f] = ln
 			}
 		}
@@ -254,7 +254,7 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 			}
 
 			if len(lacks) == 0 {
-				for i, f := range proc.Chain.Parent.RequestUniqueKeyFields {
+				for i, f := range proc.ChainParentLocal.RequestUniqueKeyFields {
 					if _, exists := fields[f]; exists {
 						delete(fields, f)
 						tp := ""
@@ -312,7 +312,7 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 		return
 	}
 
-	jbPairs, fieldNames, fieldVals := proc.Chain.Parent.DBFields.Prepare(proc.Fields)
+	jbPairs, fieldNames, fieldVals := proc.ChainParentLocal.DBFields.Prepare(proc.Fields)
 	if err != nil {
 		code = http.StatusBadRequest
 		return
@@ -375,7 +375,7 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 
 	var returnsObj *[]ExecResultRow
 
-	if !forUpdate && proc.Chain.Parent.Flags&path.FlagCreateReturnsObject != 0 {
+	if !forUpdate && proc.ChainParentLocal.Flags&path.FlagCreateReturnsObject != 0 {
 		// Get result from INSERT ... RETURNING id
 		returnsObj = &res.Rows
 	}
