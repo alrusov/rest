@@ -156,8 +156,10 @@ const (
 	ScopeInsert        = "insert"
 	ScopeUpdateID      = "update.id"
 	ScopeUpdateGUID    = "update.guid"
+	ScopeUpdateName    = "update.name"
 	ScopeDeleteID      = "delete.id"
 	ScopeDeleteGUID    = "delete.guid"
+	ScopeDeleteName    = "delete.name"
 
 	// Признак статуса
 	StatusActive   = "active"
