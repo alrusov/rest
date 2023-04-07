@@ -87,13 +87,14 @@ func (x *Config) Check(cfg any) (err error) {
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-func Compose(logFacility *log.Facility, cfg *Config, prefix string) (result *oa.T, err error) {
+func Compose(logFacility *log.Facility, cfg *Config, httpCfg *config.Listener, prefix string) (result *oa.T, err error) {
 	if prefix != "" {
 		prefix = "/" + strings.Trim(prefix, "/")
 	}
 
 	proc := &processor{
 		oaCfg:   cfg,
+		httpCfg: httpCfg,
 		prefix:  prefix,
 		knownID: make(map[string]uint, 1024),
 		schemas: make(map[string]*oa.Schema, 1024),
@@ -185,9 +186,35 @@ func (proc *processor) prepare() (err error) {
 		)
 	}
 
+	securitySchemes := oa.SecuritySchemes{}
+
+	if m, exists := proc.httpCfg.Auth.Methods["jwt"]; exists {
+		if m.Enabled {
+			name := "jwtAuth"
+			securitySchemes[name] = &oa.SecuritySchemeRef{
+				Value: oa.NewJWTSecurityScheme(),
+			}
+		}
+	}
+
+	if m, exists := proc.httpCfg.Auth.Methods["basic"]; exists {
+		if m.Enabled {
+			name := "basicAuth"
+			securitySchemes[name] = &oa.SecuritySchemeRef{
+				Value: &oa.SecurityScheme{
+					Type:   "http",
+					Scheme: "basic",
+				},
+			}
+		}
+	}
+
 	proc.result = &oa.T{
-		OpenAPI:    oaCfg.APIversion,
-		Components: &oa.Components{Schemas: make(oa.Schemas)},
+		OpenAPI: oaCfg.APIversion,
+		Components: &oa.Components{
+			Schemas:         make(oa.Schemas),
+			SecuritySchemes: securitySchemes,
+		},
 		Info: &oa.Info{
 			Title:          oaCfg.Title,
 			Description:    oaCfg.Description,
