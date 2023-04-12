@@ -217,16 +217,16 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 	// Check fields
 	if len(proc.Fields) > 0 {
 		var lacks []string
-		var uniqCounts misc.IntMap
+		var requiredCounts misc.IntMap
 
 		rqLn := len(proc.ChainParentLocal.RequestRequiredFields)
 		if rqLn > 0 {
 			lacks = make([]string, 0, rqLn)
-			uniqCounts = make(misc.IntMap, rqLn)
+			requiredCounts = make(misc.IntMap, rqLn)
 
 			ln := len(proc.Fields)
 			for _, f := range proc.ChainParentLocal.RequestRequiredFields {
-				uniqCounts[f] = ln
+				requiredCounts[f] = ln
 			}
 		}
 
@@ -241,7 +241,7 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 			proc.Fields = proc.Fields[0:1]
 			fields := proc.Fields[0]
 
-			for f := range uniqCounts {
+			for f := range requiredCounts {
 				v, exists := fields[f]
 				if !exists {
 					continue
@@ -269,7 +269,7 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 			// Insert: check a required fields
 			if rqLn > 0 {
 				for _, fields := range proc.Fields {
-					for f, n := range uniqCounts {
+					for f, n := range requiredCounts {
 						v, exists := fields[f]
 						if !exists {
 							continue
@@ -280,11 +280,11 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 							continue
 						}
 
-						uniqCounts[f] = n - 1
+						requiredCounts[f] = n - 1
 					}
 				}
 
-				for f, n := range uniqCounts {
+				for f, n := range requiredCounts {
 					if n != 0 {
 						lacks = append(lacks, f)
 					}
@@ -298,12 +298,32 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 		}
 	}
 
+	excluded := make([]string, 0, 16)
+
 	if proc.ExcludedFields != nil {
 		for i := range proc.Fields {
-			for name := range proc.ExcludedFields {
-				delete(proc.Fields[i], name)
+			for jName, dbName := range proc.ExcludedFields {
+				if _, exists := proc.Fields[i][dbName]; exists {
+					excluded = append(excluded, jName)
+					delete(proc.Fields[i], dbName)
+				}
 			}
 		}
+	}
+
+	if proc.ChainParentLocal.RequestReadonlyFields != nil {
+		for i := range proc.Fields {
+			for jName, dbName := range proc.ChainParentLocal.RequestReadonlyFields {
+				if _, exists := proc.Fields[i][dbName]; exists {
+					excluded = append(excluded, jName)
+					delete(proc.Fields[i], dbName)
+				}
+			}
+		}
+	}
+
+	if len(excluded) != 0 {
+		proc.Notices.Add("readonly fields were ignored: %s", strings.Join(excluded, ", "))
 	}
 
 	if len(proc.Fields) == 0 || len(proc.Fields[0]) == 0 {

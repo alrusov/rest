@@ -47,6 +47,7 @@ type (
 		RequestType            reflect.Type   `json:"-"`
 		RequestFlatModel       misc.StringMap `json:"-"`                      // ключ - путь до поля, значение - его tag db
 		RequestRequiredFields  misc.StringMap `json:"-"`                      // обязательные поля, значение - его tag db
+		RequestReadonlyFields  misc.StringMap `json:"-"`                      // поля только на чтение, значение - его tag db
 		RequestUniqueKeyFields []string       `json:"requestUniqueKeyFields"` // уникальные поля, первый - primary key (формально)
 
 		ResponseObjectName  string       `json:"responseObjectName"`
@@ -109,6 +110,7 @@ const (
 	TagSample   = "sample"
 	TagComment  = "comment"
 	TagRequired = "required"
+	TagReadonly = "readonly"
 	TagRole     = "role"
 	TagRef      = "ref"
 	TagDefault  = "default"
@@ -218,6 +220,10 @@ func (chains *Chains) Prepare(m string) (err error) {
 
 	if len(chains.RequestRequiredFields) == 0 {
 		chains.RequestRequiredFields = make(misc.StringMap, 16)
+	}
+
+	if len(chains.RequestReadonlyFields) == 0 {
+		chains.RequestReadonlyFields = make(misc.StringMap, 16)
 	}
 
 	if chains.RequestPattern != nil {
@@ -592,6 +598,10 @@ func (chains *Chains) typeFlatModelIterator(base string, model *misc.StringMap, 
 
 			if misc.StructTagName(&f, TagRequired) == "true" {
 				chains.RequestRequiredFields[fName] = dbName
+			}
+
+			if misc.StructTagName(&f, TagReadonly) == "true" {
+				chains.RequestReadonlyFields[fName] = dbName
 			}
 
 		}
