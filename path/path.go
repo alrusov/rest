@@ -66,6 +66,7 @@ type (
 
 	Chain struct {
 		Parent      *Chains  `json:"-"`
+		Flags       Flags    `json:"flags,omitempty"`
 		Description string   `json:"description"`
 		Name        string   `json:"name"`
 		Scope       string   `json:"scope,omitempty"`
@@ -96,6 +97,8 @@ const (
 	FlagRequestDontMakeFlatModel = Flags(0x00000002)
 	FlagResponseIsNotArray       = Flags(0x00000004)
 	FlagCreateReturnsObject      = Flags(0x00000008)
+
+	FlagChainDefault = Flags(0x00000001)
 
 	// VarName
 	VarIgnore = "_"
@@ -393,10 +396,51 @@ func (chains *Chains) Prepare(m string) (err error) {
 
 func (chains *Chains) Find(path []string) (matched *Chain, pathParams any, code int, err error) {
 	code = 0
-
 	msgs := misc.NewMessages()
+
+	pp := reflect.New(chains.PathParamsType)
+
 	defer func() {
 		err = msgs.Error()
+		if err != nil {
+			return
+		}
+
+		if matched == nil {
+			c := chains.Chains[len(chains.Chains)-1]
+			if c.Flags&FlagChainDefault == 0 {
+				code = http.StatusNotFound
+				return
+			}
+
+			matched = c
+			code = 0
+		}
+
+		ppp := pp.Elem()
+
+		for i, token := range matched.Tokens {
+			if token.VarName == VarIgnore {
+				continue
+			}
+
+			if i >= len(path) {
+				break
+			}
+
+			err = misc.Iface2IfacePtr(path[i], ppp.FieldByName(token.VarName).Addr().Interface())
+			if err != nil {
+				msgs.AddError(err)
+			}
+		}
+
+		pathParams = pp.Interface()
+
+		err = msgs.Error()
+		if err != nil {
+			matched = nil
+			return
+		}
 	}()
 
 	if !chains.prepared {
@@ -404,8 +448,6 @@ func (chains *Chains) Find(path []string) (matched *Chain, pathParams any, code 
 		code = http.StatusInternalServerError
 		return
 	}
-
-	pp := reflect.New(chains.PathParamsType)
 
 	ln := len(path)
 
@@ -425,7 +467,6 @@ func (chains *Chains) Find(path []string) (matched *Chain, pathParams any, code 
 		}
 
 		if len(chain.Tokens) > ln {
-			code = http.StatusNotFound
 			return
 		}
 
@@ -443,29 +484,6 @@ func (chains *Chains) Find(path []string) (matched *Chain, pathParams any, code 
 	}
 
 	if matched == nil {
-		code = http.StatusNotFound
-		return
-	}
-
-	ppp := pp.Elem()
-
-	for i, token := range matched.Tokens {
-		if token.VarName == VarIgnore {
-			continue
-		}
-
-		err = misc.Iface2IfacePtr(path[i], ppp.FieldByName(token.VarName).Addr().Interface())
-		if err != nil {
-			msgs.AddError(err)
-		}
-	}
-
-	pathParams = pp.Interface()
-
-	err = msgs.Error()
-	if err != nil {
-		code = http.StatusNotFound
-		matched = nil
 		return
 	}
 
@@ -481,6 +499,10 @@ func (chains *Chains) Len() int {
 }
 
 func (chains *Chains) Less(i, j int) bool {
+	if chains.Chains[i].Flags&FlagChainDefault != chains.Chains[j].Flags&FlagChainDefault {
+		return chains.Chains[i].Flags&FlagChainDefault == 0
+	}
+
 	ln1 := len(chains.Chains[i].Tokens)
 	ln2 := len(chains.Chains[j].Tokens)
 

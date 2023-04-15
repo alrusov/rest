@@ -20,12 +20,20 @@ import (
 	"github.com/alrusov/stdhttp"
 )
 
+type (
+	FindModule func(path string) (module *Module, basePath string, extraPath []string, found bool)
+)
+
 //----------------------------------------------------------------------------------------------------------------------------//
 
 // Обработчик прикладных HTTP запросов
 func Handler(h *stdhttp.HTTP, id uint64, prefix string, urlPath string, w http.ResponseWriter, r *http.Request) (basePath string, processed bool) {
+	return HandlerEx(findModule, nil, h, id, prefix, urlPath, w, r)
+}
+
+func HandlerEx(find FindModule, extra any, h *stdhttp.HTTP, id uint64, prefix string, urlPath string, w http.ResponseWriter, r *http.Request) (basePath string, processed bool) {
 	// Ищем обработчик
-	module, basePath, tail, found := findModule(urlPath)
+	module, basePath, tail, found := find(urlPath)
 	if !found {
 		return
 	}
@@ -33,17 +41,19 @@ func Handler(h *stdhttp.HTTP, id uint64, prefix string, urlPath string, w http.R
 	processed = true
 
 	proc := &ProcOptions{
-		handler:      module.handler,
-		LogFacility:  module.logFacility,
+		handler:      module.Handler,
+		LogFacility:  module.LogFacility,
 		H:            h,
 		LogSrc:       fmt.Sprintf("%d", id),
-		Info:         module.info,
+		Info:         module.Info,
 		ID:           id,
 		Prefix:       prefix,
 		Path:         urlPath,
+		Tail:         tail,
 		R:            r,
 		W:            w,
 		Notices:      misc.NewMessages(),
+		Extra:        extra,
 		ExtraHeaders: make(misc.StringMap, 8),
 	}
 
@@ -55,7 +65,7 @@ func Handler(h *stdhttp.HTTP, id uint64, prefix string, urlPath string, w http.R
 		r.Method = stdhttp.MethodPOST // Это ответ kAPI"
 	}
 
-	proc.Chain, proc.PathParams, result, code, err = module.info.Methods.Find(r.Method, tail)
+	proc.Chain, proc.PathParams, result, code, err = module.Info.Methods.Find(r.Method, tail)
 
 	if err != nil || code != 0 || result != nil {
 		proc.reply(code, result, err)
@@ -76,6 +86,7 @@ func Handler(h *stdhttp.HTTP, id uint64, prefix string, urlPath string, w http.R
 
 	r.Body.Close()
 	r.Body = nil
+
 	proc.RawBody = bodyBuf.Bytes()
 
 	// Парсим тело
@@ -120,7 +131,7 @@ func Handler(h *stdhttp.HTTP, id uint64, prefix string, urlPath string, w http.R
 	}
 
 	if code == StatusProcessed {
-		module.logFacility.Message(log.TRACE3, "[%d] Answer already sent, do nothing", id)
+		module.LogFacility.Message(log.TRACE3, "[%d] Answer already sent, do nothing", id)
 		return
 	}
 
@@ -132,7 +143,7 @@ func Handler(h *stdhttp.HTTP, id uint64, prefix string, urlPath string, w http.R
 //----------------------------------------------------------------------------------------------------------------------------//
 
 // Поиск обработчкика для запроса по его URL
-func findModule(path string) (module *module, basePath string, extraPath []string, found bool) {
+func findModule(path string) (module *Module, basePath string, extraPath []string, found bool) {
 	found = false
 
 	p := path

@@ -104,12 +104,12 @@ func ModuleRegistration(handler API) (err error) {
 		info.QueryPrefix += "."
 	}
 
-	p := &module{
-		rawURL:      url,
-		relativeURL: relURL,
-		handler:     handler,
-		info:        info,
-		logFacility: log.NewFacility(url),
+	p := &Module{
+		RawURL:      url,
+		RelativeURL: relURL,
+		Handler:     handler,
+		Info:        info,
+		LogFacility: log.NewFacility(url),
 	}
 
 	modulesMutex.Lock()
@@ -129,7 +129,7 @@ func ModuleRegistration(handler API) (err error) {
 		}
 	}
 
-	p.logFacility.Message(log.INFO, "Initialized")
+	p.LogFacility.Message(log.INFO, "Initialized")
 
 	return
 }
@@ -141,9 +141,9 @@ func RemoveModuleRegistration(handler API) (err error) {
 	defer modulesMutex.Unlock()
 
 	for name, df := range modules {
-		if df.handler == handler {
+		if df.Handler == handler {
 			delete(modules, name)
-			httpHdl.DelEndpointsInfo(misc.StringMap{df.rawURL: ""})
+			httpHdl.DelEndpointsInfo(misc.StringMap{df.RawURL: ""})
 			break
 		}
 	}

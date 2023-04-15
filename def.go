@@ -69,6 +69,7 @@ type (
 		ID               uint64              // ID запроса
 		Prefix           string              // Префикс пути запроса (при работе через прокси)
 		Path             string              // Путь запроса
+		Tail             []string            // Остаток пути
 		R                *http.Request       // Запрос
 		W                http.ResponseWriter // Интерфейс для ответа
 		Chain            *path.Chain         // Обрабатываемая цепочка
@@ -87,16 +88,17 @@ type (
 		ExecResult       *ExecResult         // Результат выполнения Exec
 		ExtraHeaders     misc.StringMap      // Дополнительные возвращаемые HTTP заголовки
 
+		Extra  any // Произвольные данные от вызывающего
 		Custom any // Произвольные пользовательские данные
 	}
 
 	// Обработчик
-	module struct {
-		rawURL      string
-		relativeURL string        // URL без учета базовой части
-		handler     API           // Интерфейс метода
-		info        *Info         // Информация о методе
-		logFacility *log.Facility // Log facility
+	Module struct {
+		RawURL      string
+		RelativeURL string        // URL без учета базовой части
+		Handler     API           // Интерфейс метода
+		Info        *Info         // Информация о методе
+		LogFacility *log.Facility // Log facility
 	}
 
 	FieldDef struct {
@@ -197,7 +199,7 @@ var (
 	configs misc.InterfaceMap
 
 	modulesMutex = new(sync.RWMutex)
-	modules      = map[string]*module{} // Обработчики API
+	modules      = map[string]*Module{} // Обработчики API
 
 	tags    = Tags{}
 	tagsMap = map[string]*Tag{}
@@ -212,7 +214,7 @@ func Enumerate(e Enumerator) (err error) {
 	defer modulesMutex.RUnlock()
 
 	for path, df := range modules {
-		err = e(path, df.info)
+		err = e(path, df.Info)
 		if err != nil {
 			return
 		}
