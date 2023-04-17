@@ -1007,7 +1007,7 @@ func (proc *processor) scanObject(parentList *misc.BoolMap, parent *oa.SchemaRef
 				me = filler(parent, &field, "", "", "")
 			}
 
-			if me != nil {
+			if me != nil || field.Anonymous {
 				ref := field.Tag.Get(path.TagRef)
 				if ref != "" {
 					filler(me, nil, "ref", "", ref)
