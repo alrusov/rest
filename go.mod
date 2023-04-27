@@ -9,7 +9,7 @@ require (
 	github.com/alrusov/log v0.1.37
 	github.com/alrusov/misc v1.1.8
 	github.com/alrusov/stdhttp v0.1.114
-	github.com/getkin/kin-openapi v0.115.0
+	github.com/getkin/kin-openapi v0.116.0
 )
 
 require (

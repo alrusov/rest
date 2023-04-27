@@ -98,7 +98,8 @@ const (
 	FlagResponseIsNotArray       = Flags(0x00000004)
 	FlagCreateReturnsObject      = Flags(0x00000008)
 
-	FlagChainDefault = Flags(0x00000001)
+	FlagChainDefault    = Flags(0x00000001)
+	FlagChainEnableTail = Flags(0x00000002)
 
 	// VarName
 	VarIgnore = "_"
@@ -462,7 +463,7 @@ func (chains *Chains) Find(path []string) (matched *Chain, pathParams any, code 
 	for ci := 0; ci < len(chains.Chains); ci++ {
 		chain := chains.Chains[ci]
 
-		if len(chain.Tokens) < ln {
+		if len(chain.Tokens) < ln && chain.Flags&FlagChainEnableTail == 0 {
 			continue
 		}
 
