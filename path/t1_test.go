@@ -27,7 +27,9 @@ func TestPrepareIllegal(t *testing.T) {
 			},
 		},
 		{
-			PathParamsPattern: "test",
+			StdParams: Params{
+				PathParamsPattern: "test",
+			},
 			Chains: []*Chain{
 				{
 					Name: "illegal PathParamsPattern type",
@@ -38,14 +40,18 @@ func TestPrepareIllegal(t *testing.T) {
 			},
 		},
 		{
-			PathParamsPattern: pathParamsPattern{},
+			StdParams: Params{
+				PathParamsPattern: pathParamsPattern{},
+			},
 			Chains: []*Chain{
 				// Empty
 				{},
 			},
 		},
 		{
-			PathParamsPattern: struct{ X float64 }{},
+			StdParams: Params{
+				PathParamsPattern: struct{ X float64 }{},
+			},
 			Chains: []*Chain{
 				{
 					Name: "illegal PathParamsPattern field type",
@@ -56,7 +62,9 @@ func TestPrepareIllegal(t *testing.T) {
 			},
 		},
 		{
-			PathParamsPattern: pathParamsPattern{},
+			StdParams: Params{
+				PathParamsPattern: pathParamsPattern{},
+			},
 			Chains: []*Chain{
 				{
 					Name: "unknown field X",
@@ -67,7 +75,9 @@ func TestPrepareIllegal(t *testing.T) {
 			},
 		},
 		{
-			PathParamsPattern: pathParamsPattern{},
+			StdParams: Params{
+				PathParamsPattern: pathParamsPattern{},
+			},
 			Chains: []*Chain{
 				{
 					Name: "tokens with empty first expression",
@@ -79,12 +89,18 @@ func TestPrepareIllegal(t *testing.T) {
 			},
 		},
 		{
-			RequestObjectName: "o1",
-			RequestPattern: struct {
-				a int
-				b string
-			}{},
-			PathParamsPattern: pathParamsPattern{},
+			StdParams: Params{
+				Request: RequestParams{
+					ParamsObject: ParamsObject{
+						Name: "o1",
+						Pattern: struct {
+							a int
+							b string
+						}{},
+					},
+				},
+				PathParamsPattern: pathParamsPattern{},
+			},
 			Chains: []*Chain{
 				{
 					Name: "bad regexp",
@@ -96,13 +112,19 @@ func TestPrepareIllegal(t *testing.T) {
 			},
 		},
 		{
-			RequestObjectName: "o1",
-			RequestPattern: struct {
-				a int
-				b string
-				c int
-			}{},
-			PathParamsPattern: pathParamsPattern{},
+			StdParams: Params{
+				Request: RequestParams{
+					ParamsObject: ParamsObject{
+						Name: "o1",
+						Pattern: struct {
+							a int
+							b string
+							c int
+						}{},
+					},
+				},
+				PathParamsPattern: pathParamsPattern{},
+			},
 			Chains: []*Chain{
 				{
 					Name: "bad regexp",
@@ -126,8 +148,9 @@ func TestPrepareIllegal(t *testing.T) {
 
 func TestParser(t *testing.T) {
 	c := Chains{
-		PathParamsPattern: pathParamsPattern{},
-
+		StdParams: Params{
+			PathParamsPattern: pathParamsPattern{},
+		},
 		// unsorted!
 		Chains: []*Chain{
 			// Active or blocked users in group with ID=gid

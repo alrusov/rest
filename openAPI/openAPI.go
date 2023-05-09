@@ -396,77 +396,69 @@ func (proc *processor) scanChains(chains *path.Set, urlPath string, info *rest.I
 
 	okStr := "OK"
 
-	queryParams, e := proc.makeQueryParameters(info.Methods)
-	if e != nil {
-		err = fmt.Errorf("%s", e)
-		return
-	}
-
 	// Сканируем цепочки отдельно для каждого из методов
 	for method, chains := range chains.Methods {
-		// Парсим request параметры
-		var requestSchema *oa.SchemaRef
-
-		// Response headers
-
-		var responseHeaders map[string]*oa.HeaderRef
-		if len(chains.OutHeaders) > 0 {
-			responseHeaders = make(map[string]*oa.HeaderRef, 16)
-		}
-
-		for name, descr := range chains.OutHeaders {
-			err = proc.addComponentHeader(name, descr)
-			if err != nil {
-				return
-			}
-			responseHeaders[name] = &oa.HeaderRef{
-				Ref: refComponentsHeaders + name,
-			}
-		}
-
-		//
-
-		if chains.RequestObjectName != "" {
-			name := chains.RequestObjectName
-			obj, exists := proc.result.Components.Schemas[name]
-			if !exists {
-				err = fmt.Errorf("%s: unknown request object %s", method, name)
-				return
-			}
-
-			requestSchema = &oa.SchemaRef{
-				Ref:   refComponentsSchemas + name,
-				Value: obj.Value,
-			}
-			proc.schemas[name] = obj.Value
-		}
-
-		// Парсим response параметры
-
-		var responseSchema *oa.SchemaRef
-
-		if chains.ResponseObjectName != "" {
-			name := chains.ResponseObjectName
-
-			if chains.Flags&path.FlagResponseIsNotArray == 0 {
-				name += "Array"
-			}
-
-			obj, exists := proc.result.Components.Schemas[name]
-			if !exists {
-				err = fmt.Errorf("%s: unknown response object %s", method, name)
-				return
-			}
-
-			responseSchema = &oa.SchemaRef{
-				Ref:   refComponentsSchemas + name,
-				Value: obj.Value,
-			}
-			proc.schemas[name] = obj.Value
-		}
-
 		// Бежим по цепочкам
 		for _, chain := range chains.Chains {
+			// Парсим request параметры
+			var requestSchema *oa.SchemaRef
+
+			// Response headers
+
+			var responseHeaders map[string]*oa.HeaderRef
+			if len(chain.Params.OutHeaders) > 0 {
+				responseHeaders = make(map[string]*oa.HeaderRef, 16)
+			}
+
+			for name, descr := range chain.Params.OutHeaders {
+				err = proc.addComponentHeader(name, descr)
+				if err != nil {
+					return
+				}
+				responseHeaders[name] = &oa.HeaderRef{
+					Ref: refComponentsHeaders + name,
+				}
+			}
+
+			if chain.Params.Request.Name != "" {
+				name := chain.Params.Request.Name
+				obj, exists := proc.result.Components.Schemas[name]
+				if !exists {
+					err = fmt.Errorf("%s: unknown request object %s", method, name)
+					return
+				}
+
+				requestSchema = &oa.SchemaRef{
+					Ref:   refComponentsSchemas + name,
+					Value: obj.Value,
+				}
+				proc.schemas[name] = obj.Value
+			}
+
+			// Парсим response параметры
+
+			var responseSchema *oa.SchemaRef
+
+			if chain.Params.Response.Name != "" {
+				name := chain.Params.Response.Name
+
+				if chain.Params.Flags&path.FlagResponseIsNotArray == 0 {
+					name += "Array"
+				}
+
+				obj, exists := proc.result.Components.Schemas[name]
+				if !exists {
+					err = fmt.Errorf("%s: unknown response object %s", method, name)
+					return
+				}
+
+				responseSchema = &oa.SchemaRef{
+					Ref:   refComponentsSchemas + name,
+					Value: obj.Value,
+				}
+				proc.schemas[name] = obj.Value
+			}
+
 			// Парсим путь
 			urlPath, pathExpr, pathParams, e := proc.makePathParameters(urlPath, chain)
 			if e != nil {
@@ -556,7 +548,7 @@ func (proc *processor) scanChains(chains *path.Set, urlPath string, info *rest.I
 
 			// Request headers
 
-			for name, descr := range chains.InHeaders {
+			for name, descr := range chain.Params.InHeaders {
 				p := &oa.Parameter{
 					Name:        name,
 					In:          "header",
@@ -579,10 +571,14 @@ func (proc *processor) scanChains(chains *path.Set, urlPath string, info *rest.I
 
 			// Добавляем query параметры
 
-			if pp, exists := queryParams[method]; exists {
-				for _, p := range pp {
-					op.AddParameter(p)
-				}
+			queryParams, e := proc.makeQueryParameters(chain)
+			if e != nil {
+				err = fmt.Errorf("%s", e)
+				return
+			}
+
+			for _, p := range queryParams {
+				op.AddParameter(p)
 			}
 
 			op.Tags = info.Tags
@@ -626,7 +622,7 @@ func (proc *processor) makePathParameters(urlPath string, chain *path.Chain) (fu
 
 		enumItems := makeEnum(token.Expr, "|")
 
-		field, exists := chain.Parent.PathParamsType.FieldByName(token.VarName)
+		field, exists := chain.Params.PathParamsType.FieldByName(token.VarName)
 		if !exists {
 			err = fmt.Errorf("%s: field not found", token.VarName)
 			return
@@ -693,21 +689,14 @@ func (proc *processor) makePathParameters(urlPath string, chain *path.Chain) (fu
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-func (proc *processor) makeQueryParameters(params *path.Set) (pp map[string][]*oa.Parameter, err error) {
-	pp = make(map[string][]*oa.Parameter, len(params.Methods))
+func (proc *processor) makeQueryParameters(chain *path.Chain) (qp []*oa.Parameter, err error) {
+	if chain.Params.QueryParamsType == nil {
+		return
+	}
 
-	for method, df := range params.Methods {
-		if df.QueryParamsType == nil {
-			continue
-		}
-
-		p, e := proc.makeParameters(df.QueryParamsType, "query")
-		if e != nil {
-			err = e
-			return
-		}
-
-		pp[method] = append(pp[method], p...)
+	qp, err = proc.makeParameters(chain.Params.QueryParamsType, "query")
+	if err != nil {
+		return
 	}
 
 	return

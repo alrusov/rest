@@ -28,36 +28,11 @@ type (
 	Method = string
 
 	Chains struct {
-		Flags       Flags          `json:"flags,omitempty"`
-		InHeaders   misc.StringMap `json:"inHeaders,omitempty"`  // name -> description
-		OutHeaders  misc.StringMap `json:"outHeaders,omitempty"` // name -> description
-		Summary     string         `json:"summary"`
-		Description string         `json:"description"`
-		Chains      ChainsList     `json:"chains"`
+		Summary     string     `json:"summary"`
+		Description string     `json:"description"`
+		Chains      ChainsList `json:"chains"`
 
-		PathParamsPattern any          `json:"pathParams"`
-		PathParamsType    reflect.Type `json:"-"`
-
-		QueryParamsPattern any          `json:"queryParams"`
-		QueryParamsType    reflect.Type `json:"-"`
-
-		RequestObjectName      string         `json:"requestObjectName"`
-		RequestContentType     string         `json:"requestContentType,omitempty"` // Значение по умолчанию для Content-Type на входе. По умолчанию JSON
-		RequestPattern         any            `json:"request"`
-		RequestType            reflect.Type   `json:"-"`
-		RequestFlatModel       misc.StringMap `json:"-"`                      // ключ - путь до поля, значение - его tag db
-		RequestRequiredFields  misc.StringMap `json:"-"`                      // обязательные поля, значение - его tag db
-		RequestReadonlyFields  misc.StringMap `json:"-"`                      // поля только на чтение, значение - его tag db
-		RequestUniqueKeyFields []string       `json:"requestUniqueKeyFields"` // уникальные поля, первый - primary key (формально)
-
-		ResponseObjectName  string       `json:"responseObjectName"`
-		ResponseContentType string       `json:"responseContentType,omitempty"` // Значение по умолчанию для Content-Type на выходе. По умолчанию JSON
-		ResponsePattern     any          `json:"response"`
-		ResponseType        reflect.Type `json:"-"`
-		SrcResponsePattern  any          `json:"-"`
-		SrcResponseType     reflect.Type `json:"-"`
-
-		DBFields *db.FieldsList `json:"-"`
+		StdParams Params `json:"params"`
 
 		prepared bool
 	}
@@ -70,6 +45,7 @@ type (
 		Description string   `json:"description"`
 		Name        string   `json:"name"`
 		Scope       string   `json:"scope,omitempty"`
+		Params      Params   `json:"params"`
 		Tokens      []*Token `json:"tokens"`
 	}
 
@@ -88,6 +64,45 @@ type (
 	Vars misc.InterfaceMap
 
 	Flags uint64
+
+	Params struct {
+		Flags Flags `json:"flags,omitempty"`
+
+		InHeaders  misc.StringMap `json:"inHeaders,omitempty"`  // name -> description
+		OutHeaders misc.StringMap `json:"outHeaders,omitempty"` // name -> description
+
+		PathParamsPattern any          `json:"pathParams"`
+		PathParamsType    reflect.Type `json:"-"`
+
+		QueryParamsPattern any          `json:"queryParams"`
+		QueryParamsType    reflect.Type `json:"-"`
+
+		Request  RequestParams  `json:"requestParams"`
+		Response ResponseParams `json:"responseParams"`
+
+		DBFields *db.FieldsList `json:"-"`
+	}
+
+	RequestParams struct {
+		ParamsObject    `json:"object"`
+		FlatModel       misc.StringMap `json:"-"`                      // ключ - путь до поля, значение - его tag db
+		RequiredFields  misc.StringMap `json:"-"`                      // обязательные поля, значение - его tag db
+		ReadonlyFields  misc.StringMap `json:"-"`                      // поля только на чтение, значение - его tag db
+		UniqueKeyFields []string       `json:"requestUniqueKeyFields"` // уникальные поля, первый - primary key (формально)
+	}
+
+	ResponseParams struct {
+		ParamsObject `json:"object"`
+		SrcPattern   any          `json:"-"`
+		SrcType      reflect.Type `json:"-"`
+	}
+
+	ParamsObject struct {
+		Name        string       `json:"name"`
+		ContentType string       `json:"contentType,omitempty"`
+		Pattern     any          `json:"pattern"`
+		Type        reflect.Type `json:"-"`
+	}
 )
 
 const (
@@ -193,124 +208,9 @@ func (chains *Chains) Prepare(m string) (err error) {
 		return
 	}
 
-	if chains.Flags&FlagResponseHashed != 0 {
-		if chains.OutHeaders == nil {
-			chains.OutHeaders = make(misc.StringMap, 8)
-		}
-		chains.OutHeaders[stdhttp.HTTPheaderHash] = "Response body hash"
-	}
-
-	if chains.PathParamsPattern == nil {
-		chains.PathParamsPattern = struct{}{}
-	}
-
-	chains.PathParamsType, err = StructType(chains.PathParamsPattern)
+	err = chains.StdParams.Prepare(m, msgs)
 	if err != nil {
-		msgs.Add("PathParamsPattern %s", err)
 		return
-	}
-
-	if chains.QueryParamsPattern != nil {
-		chains.QueryParamsType, err = StructType(chains.QueryParamsPattern)
-		if err != nil {
-			msgs.Add("QueryParamsPattern %s", err)
-			return
-		}
-	}
-
-	if len(chains.RequestUniqueKeyFields) == 0 {
-		chains.RequestUniqueKeyFields = make([]string, 1, 16) // [0] это primary key
-	}
-
-	if len(chains.RequestRequiredFields) == 0 {
-		chains.RequestRequiredFields = make(misc.StringMap, 16)
-	}
-
-	if len(chains.RequestReadonlyFields) == 0 {
-		chains.RequestReadonlyFields = make(misc.StringMap, 16)
-	}
-
-	if chains.RequestPattern != nil {
-		if chains.RequestObjectName == "" {
-			msgs.Add("RequestObjectName not defined")
-			return
-		}
-
-		if chains.RequestContentType == "" {
-			chains.RequestContentType = stdhttp.ContentTypeJSON
-		}
-
-		chains.RequestType, err = StructType(chains.RequestPattern)
-		if err != nil {
-			msgs.Add("RequestPattern %s", err)
-			return
-		}
-
-		if chains.Flags&FlagRequestDontMakeFlatModel == 0 {
-			err = chains.MakeTypeFlatModel()
-			if err != nil {
-				msgs.Add("RequestPattern %s", err)
-				return
-			}
-		}
-
-		err = SaveObject(chains.RequestObjectName, chains.RequestType, chains.Flags&FlagResponseIsNotArray == 0)
-		if err != nil {
-			msgs.AddError(err)
-			return
-		}
-	}
-
-	if chains.ResponsePattern != nil {
-		if chains.ResponseObjectName == "" {
-			msgs.Add("ResponseObjectName not defined")
-			return
-		}
-
-		chains.ResponseType, err = StructType(chains.ResponsePattern)
-		if err != nil {
-			msgs.Add("ResponsePattern %s", err)
-			return
-		}
-
-		err = SaveObject(chains.ResponseObjectName, chains.ResponseType, chains.Flags&FlagResponseIsNotArray == 0)
-		if err != nil {
-			msgs.AddError(err)
-			return
-		}
-
-		if chains.SrcResponsePattern != nil {
-			chains.SrcResponseType, err = StructType(chains.SrcResponsePattern)
-			if err != nil {
-				msgs.Add("SrcResponsePattern %s", err)
-				return
-			}
-		}
-	}
-
-	switch m {
-	case stdhttp.MethodGET:
-		dbPattern := chains.SrcResponsePattern
-		if dbPattern == nil {
-			dbPattern = chains.ResponsePattern
-		}
-
-		if dbPattern != nil {
-			chains.DBFields, err = db.MakeFieldsList(dbPattern)
-			if err != nil {
-				msgs.Add("ResponsePattern %s", err)
-				return
-			}
-		}
-
-	default:
-		if chains.RequestPattern != nil {
-			chains.DBFields, err = db.MakeFieldsList(chains.RequestPattern)
-			if err != nil {
-				msgs.Add("RequestPattern %s", err)
-				return
-			}
-		}
 	}
 
 	// Убираем nil цепочки
@@ -338,6 +238,12 @@ func (chains *Chains) Prepare(m string) (err error) {
 	// Анализ цепочек
 
 	for ci, chain := range chains.Chains {
+		if reflect.DeepEqual(chain.Params, Params{}) {
+			chain.Params = chains.StdParams
+		} else {
+			chain.Params.Prepare(m, msgs)
+		}
+
 		chain.Parent = chains
 
 		if len(chain.Tokens) == 0 {
@@ -352,7 +258,7 @@ func (chains *Chains) Prepare(m string) (err error) {
 			}
 
 			if token.VarName != VarIgnore {
-				field, exists := chains.PathParamsType.FieldByName(token.VarName)
+				field, exists := chain.Params.PathParamsType.FieldByName(token.VarName)
 				if !exists {
 					msgs.Add(`[%d.%d] field "%s" not found in PathParamsPattern`, ci, ti, token.VarName)
 					continue
@@ -399,8 +305,6 @@ func (chains *Chains) Find(path []string) (matched *Chain, pathParams any, code 
 	code = 0
 	msgs := misc.NewMessages()
 
-	pp := reflect.New(chains.PathParamsType)
-
 	defer func() {
 		err = msgs.Error()
 		if err != nil {
@@ -418,7 +322,8 @@ func (chains *Chains) Find(path []string) (matched *Chain, pathParams any, code 
 			code = 0
 		}
 
-		ppp := pp.Elem()
+		pp := reflect.New(matched.Params.PathParamsType)
+		ppe := pp.Elem()
 
 		for i, token := range matched.Tokens {
 			if token.VarName == VarIgnore {
@@ -429,7 +334,7 @@ func (chains *Chains) Find(path []string) (matched *Chain, pathParams any, code 
 				break
 			}
 
-			err = misc.Iface2IfacePtr(path[i], ppp.FieldByName(token.VarName).Addr().Interface())
+			err = misc.Iface2IfacePtr(path[i], ppe.FieldByName(token.VarName).Addr().Interface())
 			if err != nil {
 				msgs.AddError(err)
 			}
@@ -456,7 +361,6 @@ func (chains *Chains) Find(path []string) (matched *Chain, pathParams any, code 
 		len(chains.Chains[0].Tokens) == 1 && chains.Chains[0].Tokens[0].Expr == "" {
 		// empty path -- OK
 		matched = chains.Chains[0]
-		pathParams = pp.Interface()
 		return
 	}
 
@@ -520,193 +424,6 @@ func (chains *Chains) Less(i, j int) bool {
 
 func (c *Chains) Swap(i, j int) {
 	c.Chains[i], c.Chains[j] = c.Chains[j], c.Chains[i]
-}
-
-//----------------------------------------------------------------------------------------------------------------------------//
-
-var (
-	specialTypes = misc.BoolMap{
-		reflect.TypeOf(time.Time{}).String():      true,
-		reflect.TypeOf(db.NullFloat64{}).String(): true,
-		reflect.TypeOf(db.NullInt64{}).String():   true,
-		reflect.TypeOf(db.NullUint64{}).String():  true,
-		reflect.TypeOf(db.NullString{}).String():  true,
-		reflect.TypeOf(db.NullTime{}).String():    true,
-	}
-)
-
-func (chains *Chains) MakeTypeFlatModel() (err error) {
-	chains.RequestFlatModel = make(misc.StringMap, 64)
-
-	err = chains.typeFlatModelIterator("", &chains.RequestFlatModel, chains.RequestType)
-	if err != nil {
-		return
-	}
-
-	return
-}
-
-func (chains *Chains) typeFlatModelIterator(base string, model *misc.StringMap, t reflect.Type) (err error) {
-	if t.Kind() == reflect.Pointer {
-		t = t.Elem()
-	}
-
-	ln := t.NumField()
-
-	for i := 0; i < ln; i++ {
-		f := t.Field(i)
-
-		if !f.IsExported() {
-			continue
-		}
-
-		dbName := misc.StructTagName(&f, TagDB)
-		if dbName == "-" {
-			continue
-		}
-
-		fName := misc.StructTagName(&f, TagJSON)
-		if fName == "-" {
-			fName = f.Name
-		}
-
-		if f.Anonymous {
-			fName = ""
-		}
-
-		if base != "" {
-			if fName == "" {
-				fName = base
-			} else {
-				fName = base + "." + fName
-			}
-		}
-
-		ft := f.Type
-		if ft.Kind() == reflect.Pointer {
-			ft = ft.Elem()
-		}
-
-		switch ft.Kind() {
-		case reflect.Slice, reflect.Array,
-			reflect.Invalid, reflect.Chan, reflect.Func, reflect.Map:
-			err = fmt.Errorf("unsupported type %s", f.Type.String())
-			return
-
-		case reflect.Struct:
-			if _, exists := specialTypes[f.Type.String()]; !exists {
-				err = chains.typeFlatModelIterator(fName, model, f.Type)
-				if err != nil {
-					return
-				}
-				continue
-			}
-
-			fallthrough
-
-		default:
-			(*model)[fName] = dbName
-
-			if f.Tag.Get(TagRole) == RolePrimary && base == "" { // Предполагается только на первом уровне
-				if chains.RequestUniqueKeyFields[0] != "" {
-					err = fmt.Errorf(`duplicated primary key: "%s" and "%s"`, chains.RequestUniqueKeyFields[0], fName)
-					return
-				}
-				chains.RequestUniqueKeyFields[0] = fName
-			}
-
-			if f.Tag.Get(TagRole) == RoleKey {
-				chains.RequestUniqueKeyFields = append(chains.RequestUniqueKeyFields, fName)
-			}
-
-			if misc.StructTagName(&f, TagRequired) == "true" {
-				chains.RequestRequiredFields[fName] = dbName
-			}
-
-			if misc.StructTagName(&f, TagReadonly) == "true" {
-				chains.RequestReadonlyFields[fName] = dbName
-			}
-
-		}
-	}
-
-	return
-}
-
-//----------------------------------------------------------------------------------------------------------------------------//
-
-func (chains *Chains) ExtractFieldsFromBody(body []byte) (fieldsSlice []misc.InterfaceMap, err error) {
-	if chains.RequestFlatModel == nil || len(chains.RequestFlatModel) == 0 {
-		err = fmt.Errorf("chain doesn't have a request body")
-		return
-	}
-
-	if len(body) == 0 {
-		err = fmt.Errorf("empty body")
-		return
-	}
-
-	var data any
-	err = jsonw.Unmarshal(body, &data) // Все структуры, включая вложенные, получатся как map[string]any
-	if err != nil {
-		err = fmt.Errorf("unmarshal: %s", err)
-		return
-	}
-
-	var dataSlice []any
-
-	var ok bool
-	dataSlice, ok = data.([]any)
-	if !ok {
-		err = fmt.Errorf("body is %T, expected %T", data, dataSlice)
-		return
-	}
-
-	fieldsSlice = make([]misc.InterfaceMap, 0, len(dataSlice))
-
-	for i, obj := range dataSlice {
-		objMap, ok := obj.(map[string]any)
-		if !ok {
-			err = fmt.Errorf("body[%d] is %T, expected %T", i, obj, misc.InterfaceMap(objMap))
-			return
-		}
-
-		fields := make(misc.InterfaceMap, len(chains.RequestFlatModel))
-
-		err = chains.extractFieldsFromBodyIterator("", &fields, objMap)
-		if err != nil {
-			err = fmt.Errorf("body[%d] %s", i, err)
-			return
-		}
-
-		fieldsSlice = append(fieldsSlice, fields)
-	}
-	return
-}
-
-func (chains *Chains) extractFieldsFromBodyIterator(base string, fields *misc.InterfaceMap, m misc.InterfaceMap) (err error) {
-	for fName, v := range m {
-		if base != "" {
-			fName = base + "." + fName
-		}
-
-		switch v := v.(type) {
-		case map[string]any:
-			err = chains.extractFieldsFromBodyIterator(fName, fields, misc.InterfaceMap(v))
-			if err != nil {
-				return
-			}
-
-		default:
-			dbName, exists := chains.RequestFlatModel[fName]
-			if !exists {
-				continue
-			}
-			(*fields)[dbName] = v
-		}
-	}
-
-	return
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//
@@ -815,6 +532,311 @@ func StructType(v any) (t reflect.Type, err error) {
 	if t.Kind() != reflect.Struct {
 		err = fmt.Errorf(`"%T" is not a struct or pointer to struct (%s)`, v, t.Kind())
 		return
+	}
+
+	return
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func (p *Params) Prepare(m string, msgs *misc.Messages) (err error) {
+	if p.PathParamsPattern == nil {
+		p.PathParamsPattern = struct{}{}
+	}
+
+	p.PathParamsType, err = StructType(p.PathParamsPattern)
+	if err != nil {
+		msgs.Add("PathParamsPattern %s", err)
+		return
+	}
+
+	if p.QueryParamsPattern != nil {
+		p.QueryParamsType, err = StructType(p.QueryParamsPattern)
+		if err != nil {
+			msgs.Add("QueryParamsPattern %s", err)
+			return
+		}
+	}
+
+	if len(p.Request.UniqueKeyFields) == 0 {
+		p.Request.UniqueKeyFields = make([]string, 1, 16) // [0] это primary key
+	}
+
+	if len(p.Request.RequiredFields) == 0 {
+		p.Request.RequiredFields = make(misc.StringMap, 16)
+	}
+
+	if len(p.Request.ReadonlyFields) == 0 {
+		p.Request.ReadonlyFields = make(misc.StringMap, 16)
+	}
+
+	if p.Request.Pattern != nil {
+		if p.Request.Name == "" {
+			msgs.Add("RequestObjectName not defined")
+			return
+		}
+
+		if p.Request.ContentType == "" {
+			p.Request.ContentType = stdhttp.ContentTypeJSON
+		}
+
+		p.Request.Type, err = StructType(p.Request.Pattern)
+		if err != nil {
+			msgs.Add("RequestPattern %s", err)
+			return
+		}
+
+		if p.Flags&FlagRequestDontMakeFlatModel == 0 {
+			err = p.MakeTypeFlatModel()
+			if err != nil {
+				msgs.Add("RequestPattern %s", err)
+				return
+			}
+		}
+
+		err = SaveObject(p.Request.Name, p.Request.Type, p.Flags&FlagResponseIsNotArray == 0)
+		if err != nil {
+			msgs.AddError(err)
+			return
+		}
+	}
+
+	if p.Response.Pattern != nil {
+		if p.Response.Name == "" {
+			msgs.Add("ResponseParams.Name not defined")
+			return
+		}
+
+		p.Response.Type, err = StructType(p.Response.Pattern)
+		if err != nil {
+			msgs.Add("ResponsePattern %s", err)
+			return
+		}
+
+		err = SaveObject(p.Response.Name, p.Response.Type, p.Flags&FlagResponseIsNotArray == 0)
+		if err != nil {
+			msgs.AddError(err)
+			return
+		}
+
+		if p.Response.SrcPattern != nil {
+			p.Response.SrcType, err = StructType(p.Response.SrcPattern)
+			if err != nil {
+				msgs.Add("SrcResponsePattern %s", err)
+				return
+			}
+		}
+	}
+
+	switch m {
+	case stdhttp.MethodGET:
+		dbPattern := p.Response.SrcPattern
+		if dbPattern == nil {
+			dbPattern = p.Response.Pattern
+		}
+
+		if dbPattern != nil {
+			p.DBFields, err = db.MakeFieldsList(dbPattern)
+			if err != nil {
+				msgs.Add("Response.Pattern %s", err)
+				return
+			}
+		}
+
+	default:
+		if p.Request.Pattern != nil {
+			p.DBFields, err = db.MakeFieldsList(p.Request.Pattern)
+			if err != nil {
+				msgs.Add("Request.Pattern %s", err)
+				return
+			}
+		}
+	}
+	return
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+var (
+	specialTypes = misc.BoolMap{
+		reflect.TypeOf(time.Time{}).String():      true,
+		reflect.TypeOf(db.NullFloat64{}).String(): true,
+		reflect.TypeOf(db.NullInt64{}).String():   true,
+		reflect.TypeOf(db.NullUint64{}).String():  true,
+		reflect.TypeOf(db.NullString{}).String():  true,
+		reflect.TypeOf(db.NullTime{}).String():    true,
+	}
+)
+
+func (p *Params) MakeTypeFlatModel() (err error) {
+	p.Request.FlatModel = make(misc.StringMap, 64)
+
+	err = p.typeFlatModelIterator("", &p.Request.FlatModel, p.Request.Type)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (p *Params) typeFlatModelIterator(base string, model *misc.StringMap, t reflect.Type) (err error) {
+	if t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+
+	ln := t.NumField()
+
+	for i := 0; i < ln; i++ {
+		f := t.Field(i)
+
+		if !f.IsExported() {
+			continue
+		}
+
+		dbName := misc.StructTagName(&f, TagDB)
+		if dbName == "-" {
+			continue
+		}
+
+		fName := misc.StructTagName(&f, TagJSON)
+		if fName == "-" {
+			fName = f.Name
+		}
+
+		if f.Anonymous {
+			fName = ""
+		}
+
+		if base != "" {
+			if fName == "" {
+				fName = base
+			} else {
+				fName = base + "." + fName
+			}
+		}
+
+		ft := f.Type
+		if ft.Kind() == reflect.Pointer {
+			ft = ft.Elem()
+		}
+
+		switch ft.Kind() {
+		case reflect.Slice, reflect.Array,
+			reflect.Invalid, reflect.Chan, reflect.Func, reflect.Map:
+			err = fmt.Errorf("unsupported type %s", f.Type.String())
+			return
+
+		case reflect.Struct:
+			if _, exists := specialTypes[f.Type.String()]; !exists {
+				err = p.typeFlatModelIterator(fName, model, f.Type)
+				if err != nil {
+					return
+				}
+				continue
+			}
+
+			fallthrough
+
+		default:
+			(*model)[fName] = dbName
+
+			if f.Tag.Get(TagRole) == RolePrimary && base == "" { // Предполагается только на первом уровне
+				if p.Request.UniqueKeyFields[0] != "" {
+					err = fmt.Errorf(`duplicated primary key: "%s" and "%s"`, p.Request.UniqueKeyFields[0], fName)
+					return
+				}
+				p.Request.UniqueKeyFields[0] = fName
+			}
+
+			if f.Tag.Get(TagRole) == RoleKey {
+				p.Request.UniqueKeyFields = append(p.Request.UniqueKeyFields, fName)
+			}
+
+			if misc.StructTagName(&f, TagRequired) == "true" {
+				p.Request.RequiredFields[fName] = dbName
+			}
+
+			if misc.StructTagName(&f, TagReadonly) == "true" {
+				p.Request.ReadonlyFields[fName] = dbName
+			}
+
+		}
+	}
+
+	return
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func (p *Params) ExtractFieldsFromBody(body []byte) (fieldsSlice []misc.InterfaceMap, err error) {
+	if p.Request.FlatModel == nil || len(p.Request.FlatModel) == 0 {
+		err = fmt.Errorf("chain doesn't have a request body")
+		return
+	}
+
+	if len(body) == 0 {
+		err = fmt.Errorf("empty body")
+		return
+	}
+
+	var data any
+	err = jsonw.Unmarshal(body, &data) // Все структуры, включая вложенные, получатся как map[string]any
+	if err != nil {
+		err = fmt.Errorf("unmarshal: %s", err)
+		return
+	}
+
+	var dataSlice []any
+
+	var ok bool
+	dataSlice, ok = data.([]any)
+	if !ok {
+		err = fmt.Errorf("body is %T, expected %T", data, dataSlice)
+		return
+	}
+
+	fieldsSlice = make([]misc.InterfaceMap, 0, len(dataSlice))
+
+	for i, obj := range dataSlice {
+		objMap, ok := obj.(map[string]any)
+		if !ok {
+			err = fmt.Errorf("body[%d] is %T, expected %T", i, obj, misc.InterfaceMap(objMap))
+			return
+		}
+
+		fields := make(misc.InterfaceMap, len(p.Request.FlatModel))
+
+		err = p.extractFieldsFromBodyIterator("", &fields, objMap)
+		if err != nil {
+			err = fmt.Errorf("body[%d] %s", i, err)
+			return
+		}
+
+		fieldsSlice = append(fieldsSlice, fields)
+	}
+	return
+}
+
+func (p *Params) extractFieldsFromBodyIterator(base string, fields *misc.InterfaceMap, m misc.InterfaceMap) (err error) {
+	for fName, v := range m {
+		if base != "" {
+			fName = base + "." + fName
+		}
+
+		switch v := v.(type) {
+		case map[string]any:
+			err = p.extractFieldsFromBodyIterator(fName, fields, misc.InterfaceMap(v))
+			if err != nil {
+				return
+			}
+
+		default:
+			dbName, exists := p.Request.FlatModel[fName]
+			if !exists {
+				continue
+			}
+			(*fields)[dbName] = v
+		}
 	}
 
 	return

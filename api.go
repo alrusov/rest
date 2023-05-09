@@ -72,8 +72,8 @@ func HandlerEx(find FindModule, extra any, h *stdhttp.HTTP, id uint64, prefix st
 		return
 	}
 
-	// Копия Chain.Parent для возможности ее модификации для работы с динамическими объектами. Рекомендуется использовать её, а не Chain.Parent
-	proc.ChainParentLocal = *proc.Chain.Parent
+	// Копия Chain для возможности ее модификации для работы с динамическими объектами. Рекомендуется использовать её, а не Chain.Parent
+	proc.ChainLocal = *proc.Chain
 
 	proc.Scope = proc.Chain.Scope
 
@@ -90,17 +90,19 @@ func HandlerEx(find FindModule, extra any, h *stdhttp.HTTP, id uint64, prefix st
 	proc.RawBody = bodyBuf.Bytes()
 
 	// Парсим тело
-	if len(proc.RawBody) != 0 && proc.ChainParentLocal.RequestPattern != nil {
+	requestObject := proc.ChainLocal.Params.Request
+
+	if len(proc.RawBody) != 0 && requestObject.Pattern != nil {
 		proc.RawBody = bytes.TrimSpace(proc.RawBody)
 		if len(proc.RawBody) > 0 && proc.RawBody[0] != '[' {
 			proc.RawBody = bytes.Join([][]byte{{'['}, proc.RawBody, {']'}}, []byte{})
 		}
 
 		proc.RequestParams = reflect.New(
-			reflect.SliceOf(proc.ChainParentLocal.RequestType),
+			reflect.SliceOf(requestObject.Type),
 		).Interface()
 
-		switch proc.ChainParentLocal.RequestContentType {
+		switch requestObject.ContentType {
 		case stdhttp.ContentTypeJSON:
 			err = jsonw.Unmarshal(proc.RawBody, &proc.RequestParams)
 			if err != nil {
@@ -241,8 +243,8 @@ func (proc *ProcOptions) reply(code int, result any, err error) {
 
 	var data []byte
 	contentType := stdhttp.ContentTypeJSON
-	if proc.Chain != nil && proc.ChainParentLocal.ResponseContentType != "" {
-		contentType = proc.ChainParentLocal.ResponseContentType
+	if proc.Chain != nil && proc.ChainLocal.Params.Response.ContentType != "" {
+		contentType = proc.ChainLocal.Params.Response.ContentType
 	}
 
 	if readyAnswer {
@@ -275,7 +277,7 @@ func (proc *ProcOptions) reply(code int, result any, err error) {
 				}
 
 			case stdhttp.ContentTypeJSON:
-				withHash := proc.Chain != nil && proc.ChainParentLocal.Flags&path.FlagResponseHashed != 0
+				withHash := proc.Chain != nil && proc.ChainLocal.Params.Flags&path.FlagResponseHashed != 0
 				hash := ""
 				if withHash {
 					hash = proc.R.URL.Query().Get("hash")
@@ -306,12 +308,12 @@ func (proc *ProcOptions) reply(code int, result any, err error) {
 
 // Преобразование query параметров в структуру API соответствующего метода
 func (proc *ProcOptions) parseQueryParams(src url.Values) (err error) {
-	if proc.ChainParentLocal.QueryParamsType == nil {
+	if proc.ChainLocal.Params.QueryParamsType == nil {
 		return
 	}
 
-	proc.QueryParams = reflect.New(proc.ChainParentLocal.QueryParamsType).Interface()
-	paramsT := proc.ChainParentLocal.QueryParamsType
+	proc.QueryParams = reflect.New(proc.ChainLocal.Params.QueryParamsType).Interface()
+	paramsT := proc.ChainLocal.Params.QueryParamsType
 	paramsV := reflect.ValueOf(proc.QueryParams).Elem()
 
 	nameMap := make(misc.StringMap, paramsT.NumField())

@@ -68,14 +68,14 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 		return
 	}
 
-	f := proc.ChainParentLocal.DBFields.AllDbSelect()
+	f := proc.ChainLocal.Params.DBFields.AllDbSelect()
 	fields := make([]string, len(f))
 	copy(fields, f)
 
 	compressionNeeded := false
 
 	if len(proc.Fields) != 0 { // В стандартном случае должно быть 0 или 1
-		src := proc.ChainParentLocal.DBFields.AllDbNames()
+		src := proc.ChainLocal.Params.DBFields.AllDbNames()
 
 		for i, name := range src {
 			if _, exists := proc.Fields[0][name]; !exists {
@@ -86,7 +86,7 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 	}
 
 	if proc.ExcludedFields != nil {
-		src := proc.ChainParentLocal.DBFields.AllDbNames()
+		src := proc.ChainLocal.Params.DBFields.AllDbNames()
 
 		for i, name := range src {
 			if fields[i] == "" {
@@ -127,13 +127,13 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 	}
 
 	proc.DBqueryVars = append(proc.DBqueryVars,
-		db.Subst(db.SubstJbFields, proc.ChainParentLocal.DBFields.JbFieldsStr()),
+		db.Subst(db.SubstJbFields, proc.ChainLocal.Params.DBFields.JbFieldsStr()),
 	)
 
 	for {
-		srcTp := proc.ChainParentLocal.SrcResponseType
+		srcTp := proc.ChainLocal.Params.Response.SrcType
 		if srcTp == nil {
-			srcTp = proc.ChainParentLocal.ResponseType
+			srcTp = proc.ChainLocal.Params.Response.Type
 		}
 		proc.DBqueryResult = reflect.New(reflect.SliceOf(srcTp)).Interface()
 
@@ -162,7 +162,7 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 		break
 	}
 
-	if proc.ChainParentLocal.Flags&path.FlagResponseIsNotArray != 0 {
+	if proc.ChainLocal.Params.Flags&path.FlagResponseIsNotArray != 0 {
 		v := reflect.ValueOf(proc.DBqueryResult).Elem()
 		if v.Len() == 0 {
 			code = http.StatusNoContent
@@ -195,8 +195,8 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 		res.Notice = proc.Notices.String()
 	}()
 
-	if proc.ChainParentLocal.Flags&path.FlagRequestDontMakeFlatModel == 0 {
-		proc.Fields, err = proc.ChainParentLocal.ExtractFieldsFromBody(proc.RawBody)
+	if proc.ChainLocal.Params.Flags&path.FlagRequestDontMakeFlatModel == 0 {
+		proc.Fields, err = proc.ChainLocal.Params.ExtractFieldsFromBody(proc.RawBody)
 		if err != nil {
 			return
 		}
@@ -219,13 +219,13 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 		var lacks []string
 		var requiredCounts misc.IntMap
 
-		rqLn := len(proc.ChainParentLocal.RequestRequiredFields)
+		rqLn := len(proc.ChainLocal.Params.Request.RequiredFields)
 		if rqLn > 0 {
 			lacks = make([]string, 0, rqLn)
 			requiredCounts = make(misc.IntMap, rqLn)
 
 			ln := len(proc.Fields)
-			for _, f := range proc.ChainParentLocal.RequestRequiredFields {
+			for _, f := range proc.ChainLocal.Params.Request.RequiredFields {
 				requiredCounts[f] = ln
 			}
 		}
@@ -254,7 +254,7 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 			}
 
 			if len(lacks) == 0 {
-				for i, f := range proc.ChainParentLocal.RequestUniqueKeyFields {
+				for i, f := range proc.ChainLocal.Params.Request.UniqueKeyFields {
 					if _, exists := fields[f]; exists {
 						delete(fields, f)
 						tp := ""
@@ -311,9 +311,9 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 		}
 	}
 
-	if proc.ChainParentLocal.RequestReadonlyFields != nil {
+	if proc.ChainLocal.Params.Request.ReadonlyFields != nil {
 		for i := range proc.Fields {
-			for jName, dbName := range proc.ChainParentLocal.RequestReadonlyFields {
+			for jName, dbName := range proc.ChainLocal.Params.Request.ReadonlyFields {
 				if _, exists := proc.Fields[i][dbName]; exists {
 					excluded = append(excluded, jName)
 					delete(proc.Fields[i], dbName)
@@ -332,7 +332,7 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 		return
 	}
 
-	jbPairs, fieldNames, fieldVals := proc.ChainParentLocal.DBFields.Prepare(proc.Fields)
+	jbPairs, fieldNames, fieldVals := proc.ChainLocal.Params.DBFields.Prepare(proc.Fields)
 	if err != nil {
 		code = http.StatusBadRequest
 		return
@@ -395,7 +395,7 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 
 	var returnsObj *[]ExecResultRow
 
-	if !forUpdate && proc.ChainParentLocal.Flags&path.FlagCreateReturnsObject != 0 {
+	if !forUpdate && proc.ChainLocal.Params.Flags&path.FlagCreateReturnsObject != 0 {
 		// Get result from INSERT ... RETURNING id
 		returnsObj = &res.Rows
 	}
@@ -528,10 +528,10 @@ func (info *Info) makeParamsDescription() (err error) {
 		return
 	}
 
-	for method, mDef := range info.Methods.Methods {
+	for method, chains := range info.Methods.Methods {
 		var d []string
 
-		t := mDef.QueryParamsType
+		t := chains.StdParams.QueryParamsType
 		if t != nil {
 			if t.Kind() == reflect.Pointer {
 				t = t.Elem()
@@ -574,7 +574,7 @@ func (info *Info) makeParamsDescription() (err error) {
 			d = []string{"-"}
 		}
 
-		mDef.Description = fmt.Sprintf("%s. Параметры: %s", mDef.Description, strings.Join(d, " & "))
+		chains.Description = fmt.Sprintf("%s. Параметры: %s", chains.Description, strings.Join(d, " & "))
 	}
 
 	return
