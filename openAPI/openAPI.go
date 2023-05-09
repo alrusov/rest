@@ -14,8 +14,8 @@ import (
 	"github.com/alrusov/db"
 	"github.com/alrusov/log"
 	"github.com/alrusov/misc"
-	rest "github.com/alrusov/rest/v2"
-	path "github.com/alrusov/rest/v2/path"
+	rest "github.com/alrusov/rest/v3"
+	path "github.com/alrusov/rest/v3/path"
 	"github.com/alrusov/stdhttp"
 	oa "github.com/getkin/kin-openapi/openapi3"
 )

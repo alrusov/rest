@@ -14,7 +14,7 @@ import (
 	"github.com/alrusov/db"
 	"github.com/alrusov/log"
 	"github.com/alrusov/misc"
-	path "github.com/alrusov/rest/v2/path"
+	path "github.com/alrusov/rest/v3/path"
 	"github.com/alrusov/stdhttp"
 )
 

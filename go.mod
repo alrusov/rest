@@ -1,4 +1,4 @@
-module github.com/alrusov/rest/v2
+module github.com/alrusov/rest/v3
 
 go 1.20
 
