@@ -134,6 +134,7 @@ const (
 	TagRef      = "ref"
 	TagDefault  = "default"
 	TagEnum     = "enum"
+	TagOA       = "oa"
 	TagOAtype   = "oaType"
 	TagOAformat = "oaFormat"
 
@@ -690,6 +691,11 @@ func (p *Params) typeFlatModelIterator(base string, model *misc.StringMap, t ref
 		f := t.Field(i)
 
 		if !f.IsExported() {
+			continue
+		}
+
+		readonly := f.Tag.Get(TagReadonly)
+		if readonly == "true" {
 			continue
 		}
 

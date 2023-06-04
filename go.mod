@@ -3,13 +3,13 @@ module github.com/alrusov/rest/v3
 go 1.20
 
 require (
-	github.com/alrusov/config v0.1.55
-	github.com/alrusov/db v0.1.32
+	github.com/alrusov/config v0.1.56
+	github.com/alrusov/db v0.1.33
 	github.com/alrusov/jsonw v0.1.3
 	github.com/alrusov/log v0.1.37
 	github.com/alrusov/misc v1.1.8
 	github.com/alrusov/stdhttp v0.1.114
-	github.com/getkin/kin-openapi v0.116.0
+	github.com/getkin/kin-openapi v0.117.0
 )
 
 require (

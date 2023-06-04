@@ -306,28 +306,35 @@ func (proc *processor) addComponentSchemas() (err error) {
 			continue
 		}
 
-		var objSchema *oa.Schema
-		objSchema, err = proc.makeObjectSchema(name, t.Type, "")
-		if err != nil {
-			return
-		}
+		makeSchema := func(withoutReadOnly bool, suffix string) {
+			name := name + suffix
 
-		schemas[name] = &oa.SchemaRef{
-			Value: objSchema,
-		}
-
-		if t.ArrayType != nil {
-			schemas[name+"Array"] = &oa.SchemaRef{
-				Value: &oa.Schema{
-					Type: "array",
-					Items: &oa.SchemaRef{
-						Ref:   refComponentsSchemas + name,
-						Value: objSchema,
-					},
-				},
+			var objSchema *oa.Schema
+			objSchema, err = proc.makeObjectSchema(name, t.Type, withoutReadOnly)
+			if err != nil {
+				return
 			}
-			proc.schemas[name] = objSchema
+
+			schemas[name] = &oa.SchemaRef{
+				Value: objSchema,
+			}
+
+			if t.ArrayType != nil {
+				schemas[name+"Array"] = &oa.SchemaRef{
+					Value: &oa.Schema{
+						Type: "array",
+						Items: &oa.SchemaRef{
+							Ref:   refComponentsSchemas + name,
+							Value: objSchema,
+						},
+					},
+				}
+				proc.schemas[name] = objSchema
+			}
 		}
+
+		makeSchema(false, "")
+		makeSchema(true, "CU")
 	}
 
 	proc.result.Components.Schemas = schemas
@@ -421,7 +428,7 @@ func (proc *processor) scanChains(chains *path.Set, urlPath string, info *rest.I
 			}
 
 			if chain.Params.Request.Name != "" {
-				name := chain.Params.Request.Name
+				name := chain.Params.Request.Name + "CU" // CU == (create + update) without readonly fields
 				obj, exists := proc.result.Components.Schemas[name]
 				if !exists {
 					err = fmt.Errorf("%s: unknown request object %s", method, name)
@@ -707,7 +714,7 @@ func (proc *processor) makeQueryParameters(chain *path.Chain) (qp []*oa.Paramete
 func (proc *processor) makeParameters(t reflect.Type, in string) (pp []*oa.Parameter, err error) {
 	pp = make([]*oa.Parameter, 0, 32)
 
-	err = proc.scanObject(&misc.BoolMap{}, nil, t, in,
+	err = proc.scanObject(&misc.BoolMap{}, nil, t, false,
 		func(_ *oa.SchemaRef, field *reflect.StructField, tp string, oaTp string, format string) *oa.SchemaRef {
 			switch tp {
 			case "array", "object":
@@ -715,9 +722,16 @@ func (proc *processor) makeParameters(t reflect.Type, in string) (pp []*oa.Param
 				return nil
 			}
 
-			name := misc.StructTagName(field, path.TagJSON)
+			name := field.Tag.Get(path.TagOA)
 			if name == "-" {
 				return nil
+			}
+
+			if name == "" {
+				name = misc.StructTagName(field, path.TagJSON)
+				if name == "-" {
+					return nil
+				}
 			}
 
 			descr := field.Tag.Get(path.TagComment)
@@ -769,7 +783,7 @@ func (proc *processor) makeParameters(t reflect.Type, in string) (pp []*oa.Param
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-func (proc *processor) makeObjectSchema(topName string, t reflect.Type, in string) (schema *oa.Schema, err error) {
+func (proc *processor) makeObjectSchema(topName string, t reflect.Type, withoutReadOnly bool) (schema *oa.Schema, err error) {
 	schemaRef := &oa.SchemaRef{
 		Value: &oa.Schema{
 			Description: "",
@@ -779,7 +793,7 @@ func (proc *processor) makeObjectSchema(topName string, t reflect.Type, in strin
 		},
 	}
 
-	err = proc.scanObject(&misc.BoolMap{}, schemaRef, t, in,
+	err = proc.scanObject(&misc.BoolMap{}, schemaRef, t, withoutReadOnly,
 		func(parent *oa.SchemaRef, field *reflect.StructField, tp string, oaTp string, format string) *oa.SchemaRef {
 			if field == nil { // array member
 				var s *oa.SchemaRef
@@ -807,9 +821,23 @@ func (proc *processor) makeObjectSchema(topName string, t reflect.Type, in strin
 				return s
 			}
 
-			name := misc.StructTagName(field, path.TagJSON)
+			name := field.Tag.Get(path.TagOA)
 			if name == "-" {
 				return nil
+			}
+
+			if withoutReadOnly {
+				readonly := field.Tag.Get(path.TagReadonly)
+				if readonly == "true" {
+					return nil
+				}
+			}
+
+			if name == "" {
+				name = misc.StructTagName(field, path.TagJSON)
+				if name == "-" {
+					return nil
+				}
 			}
 
 			descr := field.Tag.Get(path.TagComment)
@@ -906,7 +934,7 @@ var (
 	}
 )
 
-func (proc *processor) scanObject(parentList *misc.BoolMap, parent *oa.SchemaRef, t reflect.Type, in string, filler filler) (err error) {
+func (proc *processor) scanObject(parentList *misc.BoolMap, parent *oa.SchemaRef, t reflect.Type, withoutReadOnly bool, filler filler) (err error) {
 	tName := t.String()
 	if _, exists := (*parentList)[tName]; exists {
 		// Циклическая структура
@@ -958,6 +986,10 @@ func (proc *processor) scanObject(parentList *misc.BoolMap, parent *oa.SchemaRef
 			continue
 		}
 
+		if field.Tag.Get(path.TagOA) == "-" {
+			continue
+		}
+
 		if misc.StructTagName(&field, path.TagJSON) == "-" {
 			continue
 		}
@@ -999,9 +1031,12 @@ func (proc *processor) scanObject(parentList *misc.BoolMap, parent *oa.SchemaRef
 			if me != nil || field.Anonymous {
 				ref := field.Tag.Get(path.TagRef)
 				if ref != "" {
+					if withoutReadOnly {
+						ref += "CU"
+					}
 					filler(me, nil, "ref", "", ref)
 				} else {
-					e := proc.scanObject(parentList, me, fType, in, filler)
+					e := proc.scanObject(parentList, me, fType, withoutReadOnly, filler)
 					if e != nil {
 						err = e
 						return
@@ -1024,6 +1059,9 @@ func (proc *processor) scanObject(parentList *misc.BoolMap, parent *oa.SchemaRef
 			if me != nil {
 				ref := field.Tag.Get(path.TagRef)
 				if ref != "" {
+					if withoutReadOnly {
+						ref += "CU"
+					}
 					filler(me, nil, "ref", "", ref)
 				} else {
 					elem := fType.Elem()
@@ -1036,7 +1074,7 @@ func (proc *processor) scanObject(parentList *misc.BoolMap, parent *oa.SchemaRef
 					elemRef := filler(me, nil, tp, oaTp, format)
 
 					if kind == reflect.Struct {
-						e := proc.scanObject(parentList, elemRef, elem, in, filler)
+						e := proc.scanObject(parentList, elemRef, elem, withoutReadOnly, filler)
 						if e != nil {
 							err = e
 							return
