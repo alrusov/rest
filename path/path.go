@@ -841,6 +841,9 @@ func (p *Params) extractFieldsFromBodyIterator(base string, fields *misc.Interfa
 			if !exists {
 				continue
 			}
+			if dbName == "" {
+				dbName = fName
+			}
 			(*fields)[dbName] = v
 		}
 	}
