@@ -196,7 +196,11 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 	}()
 
 	if proc.ChainLocal.Params.Flags&path.FlagRequestDontMakeFlatModel == 0 {
-		proc.Fields, err = proc.ChainLocal.Params.ExtractFieldsFromBody(proc.RawBody)
+		var msgs *misc.Messages
+		proc.Fields, msgs, err = proc.ChainLocal.Params.ExtractFieldsFromBody(proc.RawBody)
+		if msgs.Len() > 0 {
+			Log.Message(log.DEBUG, "[%d] %s", proc.ID, msgs.String())
+		}
 		if err != nil {
 			return
 		}

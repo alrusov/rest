@@ -701,7 +701,10 @@ func (p *Params) typeFlatModelIterator(base string, model *misc.StringMap, t ref
 
 		dbName := misc.StructTagName(&f, TagDB)
 		if dbName == "-" {
-			continue
+			dbTags := misc.StructTagOpts(&f, TagDB)
+			if dbName = dbTags["clean"]; dbName == "" {
+				continue
+			}
 		}
 
 		fName := misc.StructTagName(&f, TagJSON)
@@ -774,7 +777,9 @@ func (p *Params) typeFlatModelIterator(base string, model *misc.StringMap, t ref
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-func (p *Params) ExtractFieldsFromBody(body []byte) (fieldsSlice []misc.InterfaceMap, err error) {
+func (p *Params) ExtractFieldsFromBody(body []byte) (fieldsSlice []misc.InterfaceMap, msgs *misc.Messages, err error) {
+	msgs = misc.NewMessages()
+
 	if p.Request.FlatModel == nil || len(p.Request.FlatModel) == 0 {
 		err = fmt.Errorf("chain doesn't have a request body")
 		return
@@ -785,34 +790,19 @@ func (p *Params) ExtractFieldsFromBody(body []byte) (fieldsSlice []misc.Interfac
 		return
 	}
 
-	var data any
+	var data []map[string]any
 	err = jsonw.Unmarshal(body, &data) // Все структуры, включая вложенные, получатся как map[string]any
 	if err != nil {
 		err = fmt.Errorf("unmarshal: %s", err)
 		return
 	}
 
-	var dataSlice []any
+	fieldsSlice = make([]misc.InterfaceMap, 0, len(data))
 
-	var ok bool
-	dataSlice, ok = data.([]any)
-	if !ok {
-		err = fmt.Errorf("body is %T, expected %T", data, dataSlice)
-		return
-	}
-
-	fieldsSlice = make([]misc.InterfaceMap, 0, len(dataSlice))
-
-	for i, obj := range dataSlice {
-		objMap, ok := obj.(map[string]any)
-		if !ok {
-			err = fmt.Errorf("body[%d] is %T, expected %T", i, obj, misc.InterfaceMap(objMap))
-			return
-		}
-
+	for i, objMap := range data {
 		fields := make(misc.InterfaceMap, len(p.Request.FlatModel))
 
-		err = p.extractFieldsFromBodyIterator("", &fields, objMap)
+		err = p.extractFieldsFromBodyIterator("", &fields, objMap, msgs)
 		if err != nil {
 			err = fmt.Errorf("body[%d] %s", i, err)
 			return
@@ -823,7 +813,7 @@ func (p *Params) ExtractFieldsFromBody(body []byte) (fieldsSlice []misc.Interfac
 	return
 }
 
-func (p *Params) extractFieldsFromBodyIterator(base string, fields *misc.InterfaceMap, m misc.InterfaceMap) (err error) {
+func (p *Params) extractFieldsFromBodyIterator(base string, fields *misc.InterfaceMap, m misc.InterfaceMap, msgs *misc.Messages) (err error) {
 	for fName, v := range m {
 		if base != "" {
 			fName = base + "." + fName
@@ -831,7 +821,7 @@ func (p *Params) extractFieldsFromBodyIterator(base string, fields *misc.Interfa
 
 		switch v := v.(type) {
 		case map[string]any:
-			err = p.extractFieldsFromBodyIterator(fName, fields, misc.InterfaceMap(v))
+			err = p.extractFieldsFromBodyIterator(fName, fields, misc.InterfaceMap(v), msgs)
 			if err != nil {
 				return
 			}
@@ -839,6 +829,7 @@ func (p *Params) extractFieldsFromBodyIterator(base string, fields *misc.Interfa
 		default:
 			dbName, exists := p.Request.FlatModel[fName]
 			if !exists {
+				msgs.Add(`unknown field "%s"`, fName)
 				continue
 			}
 			if dbName == "" {
