@@ -59,6 +59,7 @@ type (
 	Object struct {
 		Type      reflect.Type
 		ArrayType reflect.Type
+		WithoutCU bool
 	}
 
 	Vars misc.InterfaceMap
@@ -112,6 +113,7 @@ const (
 	FlagRequestDontMakeFlatModel = Flags(0x00000002)
 	FlagResponseIsNotArray       = Flags(0x00000004)
 	FlagCreateReturnsObject      = Flags(0x00000008)
+	FlagWithoutCU                = Flags(0x00000010)
 
 	FlagChainDefault    = Flags(0x00000001)
 	FlagChainEnableTail = Flags(0x00000002)
@@ -435,16 +437,25 @@ func GetKnownObjects() map[string]*Object {
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-func SaveObject(name string, obj reflect.Type, withArray bool) (err error) {
+func SaveObject(name string, obj reflect.Type, withArray bool, withoutCU bool) (err error) {
 	if name == VarIgnore {
 		return
 	}
 
 	r, exists := knownObjects[name]
+	if exists {
+		if r.Type != obj {
+			err = fmt.Errorf(`object "%s" already registered with another structure (%s != %s)`, name, obj, r.Type)
+			return
+		}
 
-	if exists && r.Type != obj {
-		err = fmt.Errorf(`object "%s" already registered with another structure (%s != %s)`, name, obj, r.Type)
-		return
+		if !withoutCU && r.WithoutCU {
+			r.WithoutCU = false
+		}
+
+		if !withArray || r.ArrayType != nil {
+			return
+		}
 	}
 
 	objArray := reflect.Type(nil)
@@ -457,6 +468,7 @@ func SaveObject(name string, obj reflect.Type, withArray bool) (err error) {
 	knownObjects[name] = &Object{
 		Type:      obj,
 		ArrayType: objArray,
+		WithoutCU: withoutCU,
 	}
 	return
 }
@@ -595,7 +607,7 @@ func (p *Params) Prepare(m string, msgs *misc.Messages) (err error) {
 			}
 		}
 
-		err = SaveObject(p.Request.Name, p.Request.Type, p.Flags&FlagResponseIsNotArray == 0)
+		err = SaveObject(p.Request.Name, p.Request.Type, p.Flags&FlagResponseIsNotArray == 0, false)
 		if err != nil {
 			msgs.AddError(err)
 			return
@@ -614,7 +626,7 @@ func (p *Params) Prepare(m string, msgs *misc.Messages) (err error) {
 			return
 		}
 
-		err = SaveObject(p.Response.Name, p.Response.Type, p.Flags&FlagResponseIsNotArray == 0)
+		err = SaveObject(p.Response.Name, p.Response.Type, p.Flags&FlagResponseIsNotArray == 0, p.Flags&FlagWithoutCU != 0)
 		if err != nil {
 			msgs.AddError(err)
 			return

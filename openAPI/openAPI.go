@@ -334,7 +334,10 @@ func (proc *processor) addComponentSchemas() (err error) {
 		}
 
 		makeSchema(false, "")
-		makeSchema(true, "CU")
+
+		if !t.WithoutCU {
+			makeSchema(true, "CU")
+		}
 	}
 
 	proc.result.Components.Schemas = schemas
