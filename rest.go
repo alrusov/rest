@@ -58,15 +58,15 @@ func (proc *ProcOptions) rest() (result any, code int, err error) {
 
 // Get -- получить данные
 func (proc *ProcOptions) Get() (result any, code int, err error) {
-	if proc.Info.CacheLifetime > 0 {
+	if proc.ChainLocal.CacheLifetime > 0 {
 		var ce *cache.Elem
-		ce, result, code = cache.Get(proc.ID, proc.Path, proc.PathParams, proc.QueryParams)
+		ce, result, code = cache.Get(proc.ID, proc.Path, proc.R.RequestURI, proc.PathParams, proc.QueryParams)
 		if ce == nil {
 			return
 		}
 
 		defer func() {
-			ce.Commit(proc.ID, result, code, proc.Info.CacheLifetime)
+			ce.Commit(proc.ID, result, code, proc.ChainLocal.CacheLifetime)
 		}()
 	}
 

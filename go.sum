@@ -2,8 +2,8 @@ github.com/DATA-DOG/go-sqlmock v1.5.0 h1:Shsta01QNfFxHCfpW6YH2STWB0MudeXXEWMr20O
 github.com/DATA-DOG/go-sqlmock v1.5.0/go.mod h1:f/Ixk793poVmq4qj/V1dPUg2JEAKC73Q5eFN3EC/SaM=
 github.com/alrusov/auth v0.1.4 h1:zB/Myq3uweFTco7u6AhE1g+3bx2gyAiywaYA24MKuiI=
 github.com/alrusov/auth v0.1.4/go.mod h1:ENjiFSLR7axt6li39U1DFQnNSxupnU12+pZVVlbVP2w=
-github.com/alrusov/cache v0.1.0 h1:DYGQ/mml6G441c1UgyogvSjvxg0II6G7JnqQjwIKA/E=
-github.com/alrusov/cache v0.1.0/go.mod h1:vG8bMAc7uoI5gvBo04wzRmpzyo7JXt6MTL+3gZPOSOU=
+github.com/alrusov/cache v0.1.1 h1:foO44gdohNsZ9opHTbmGIC4yEh8TrM2K7VU/BCsEgEw=
+github.com/alrusov/cache v0.1.1/go.mod h1:vG8bMAc7uoI5gvBo04wzRmpzyo7JXt6MTL+3gZPOSOU=
 github.com/alrusov/config v0.1.57 h1:tEyagi/qZfVyW+FBs4s5HvJwVqIvoMyGs6SvF5l1trE=
 github.com/alrusov/config v0.1.57/go.mod h1:aZnBFi6jVQRWkROYs0m4arhhD6++cLd4J0iep0EEbvM=
 github.com/alrusov/db v0.1.36 h1:9t1+l6h6tZrt9LX3TR/DsOti0OxrbatJ1ko21MrEwL4=
