@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/alrusov/cache"
 	"github.com/alrusov/db"
 	"github.com/alrusov/log"
 	"github.com/alrusov/misc"
@@ -57,6 +58,18 @@ func (proc *ProcOptions) rest() (result any, code int, err error) {
 
 // Get -- получить данные
 func (proc *ProcOptions) Get() (result any, code int, err error) {
+	if proc.Info.CacheLifetime > 0 {
+		var ce *cache.Elem
+		ce, result, code = cache.Get(proc.ID, proc.Path, proc.PathParams, proc.QueryParams)
+		if ce == nil {
+			return
+		}
+
+		defer func() {
+			ce.Commit(proc.ID, result, code, proc.Info.CacheLifetime)
+		}()
+	}
+
 	result, code, err = proc.before()
 	if err != nil {
 		if code == 0 {
