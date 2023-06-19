@@ -8,6 +8,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/alrusov/config"
 	"github.com/alrusov/db"
 	"github.com/alrusov/jsonw"
 	"github.com/alrusov/misc"
@@ -40,14 +41,14 @@ type (
 	ChainsList []*Chain
 
 	Chain struct {
-		Parent        *Chains       `json:"-"`
-		Flags         Flags         `json:"flags,omitempty"`
-		Description   string        `json:"description"`
-		Name          string        `json:"name"`
-		Scope         string        `json:"scope,omitempty"`
-		Params        Params        `json:"params"`
-		Tokens        []*Token      `json:"tokens"`
-		CacheLifetime time.Duration `json:"cacheLifeTime"` // Время жизни кэша, если 0, то не использовать
+		Parent        *Chains         `json:"-"`
+		Flags         Flags           `json:"flags,omitempty"`
+		Description   string          `json:"description"`
+		Name          string          `json:"name"`
+		Scope         string          `json:"scope,omitempty"`
+		Params        Params          `json:"params"`
+		Tokens        []*Token        `json:"tokens"`
+		CacheLifetime config.Duration `json:"cacheLifeTime"` // Время жизни кэша, если 0, то не использовать
 	}
 
 	Token struct {
