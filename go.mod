@@ -3,7 +3,7 @@ module github.com/alrusov/rest/v3
 go 1.20
 
 require (
-	github.com/alrusov/cache v0.1.1
+	github.com/alrusov/cache v0.1.2
 	github.com/alrusov/config v0.1.57
 	github.com/alrusov/db v0.1.36
 	github.com/alrusov/jsonw v0.1.3

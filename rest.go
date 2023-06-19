@@ -56,17 +56,36 @@ func (proc *ProcOptions) rest() (result any, code int, err error) {
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
+type (
+	cachedData struct {
+		headers misc.StringMap
+		result  any
+	}
+)
+
 // Get -- получить данные
 func (proc *ProcOptions) Get() (result any, code int, err error) {
 	if proc.ChainLocal.CacheLifetime > 0 {
-		var ce *cache.Elem
-		ce, result, code = cache.Get(proc.ID, proc.Path, proc.R.RequestURI, proc.PathParams, proc.QueryParams)
+		ce, res, resCode := cache.Get(proc.ID, proc.Path, proc.R.RequestURI, proc.PathParams, proc.QueryParams)
 		if ce == nil {
+			cd, ok := res.(cachedData)
+			if !ok {
+				code, err = InternalServerError("Illegal cached data: got %T, expected %T", res, cd)
+				return
+			}
+
+			result = cd.result
+			proc.ExtraHeaders = cd.headers
+			code = resCode
 			return
 		}
 
 		defer func() {
-			ce.Commit(proc.ID, result, code, proc.ChainLocal.CacheLifetime)
+			cd := cachedData{
+				headers: proc.ExtraHeaders,
+				result:  result,
+			}
+			ce.Commit(proc.ID, cd, code, proc.ChainLocal.CacheLifetime)
 		}()
 	}
 
