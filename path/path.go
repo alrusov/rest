@@ -88,9 +88,10 @@ type (
 
 	RequestParams struct {
 		ParamsObject    `json:"object"`
-		FlatModel       misc.StringMap `json:"-"`                      // ключ - путь до поля, значение - его tag db
-		RequiredFields  misc.StringMap `json:"-"`                      // обязательные поля, значение - его tag db
-		ReadonlyFields  misc.StringMap `json:"-"`                      // поля только на чтение, значение - его tag db
+		FlatModel       misc.StringMap `json:"-"`                      // ключ - путь до поля, значение - db name
+		RevFlatModel    misc.StringMap `json:"-"`                      // ключ - db name, значение - путь до поля
+		RequiredFields  misc.StringMap `json:"-"`                      // обязательные поля, ключ - путь до поля, значение - db name
+		ReadonlyFields  misc.StringMap `json:"-"`                      // поля только на чтение, ключ - путь до поля, значение - db name
 		UniqueKeyFields []string       `json:"requestUniqueKeyFields"` // уникальные поля, первый - primary key (формально)
 	}
 

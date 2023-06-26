@@ -234,6 +234,7 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 			Log.Message(log.DEBUG, "[%d] %s", proc.ID, msgs.String())
 		}
 		if err != nil {
+			code = http.StatusBadRequest
 			return
 		}
 	}
@@ -271,6 +272,7 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 
 			if len(proc.Fields) > 1 {
 				err = fmt.Errorf("%d records updated, expected 1", len(proc.Fields))
+				code = http.StatusBadRequest
 				return
 			}
 
@@ -329,7 +331,18 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 		}
 
 		if len(lacks) != 0 {
-			err = fmt.Errorf("empty fields: %s", strings.Join(lacks, ", "))
+			names := proc.ChainLocal.Params.DBFields.ByDbName()
+
+			for i, name := range lacks {
+				fi, exists := names[name]
+				if !exists {
+					continue
+				}
+				lacks[i] = fi.JsonName
+			}
+
+			err = fmt.Errorf("empty mandatory fields: %s", strings.Join(lacks, ", "))
+			code = http.StatusBadRequest
 			return
 		}
 	}
@@ -364,6 +377,7 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 
 	if len(proc.Fields) == 0 || len(proc.Fields[0]) == 0 {
 		proc.Notices.Add("no valid data to save")
+		code = http.StatusBadRequest
 		result = res
 		return
 	}
