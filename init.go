@@ -11,6 +11,7 @@ import (
 	"github.com/alrusov/config"
 	"github.com/alrusov/log"
 	"github.com/alrusov/misc"
+	"github.com/alrusov/rest/v3/path"
 	"github.com/alrusov/stdhttp"
 )
 
@@ -22,6 +23,9 @@ func Init(cfg any, hh *stdhttp.HTTP, basePath string, defaultDB string, extraCon
 	base = basePath
 	defDB = defaultDB
 	configs = extraConfigs
+
+	path.SaveObject(ExecResultName, reflect.TypeOf(ExecResult{}), false, false)
+	path.SaveObject(ExecResultRowName, reflect.TypeOf(ExecResultRow{}), false, false)
 
 	Log.Message(log.INFO, "Initialized")
 	return

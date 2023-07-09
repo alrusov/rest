@@ -335,7 +335,7 @@ func (proc *processor) addComponentSchemas() (err error) {
 
 		makeSchema(false, "")
 
-		if !t.WithoutCU {
+		if t.WithCU {
 			makeSchema(true, "CU")
 		}
 	}

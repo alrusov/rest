@@ -108,7 +108,7 @@ type (
 
 	ExecResult struct {
 		AffectedRows uint64          `json:"affectedRows,omitempty" comment:"Количеcтво затронутых записей"`
-		Rows         []ExecResultRow `json:"rows,omitempty" comment:"Созданные записи"`
+		Rows         []ExecResultRow `json:"rows,omitempty" comment:"Созданные записи" ref:"execResultRow"`
 		Notice       string          `json:"notice,omitempty" comment:"Предупреждения и замечания"`
 	}
 
@@ -178,7 +178,8 @@ const (
 	REstatus = StatusActive + "|" + StatusInactive
 	REguid   = `(?i)([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})`
 
-	ExecResultName = "execResult"
+	ExecResultName    = "execResult"
+	ExecResultRowName = "execResultRow"
 
 	DefaultMaxCount  = 10000
 	DefaultMaxPeriod = config.Duration(3600 * time.Second)

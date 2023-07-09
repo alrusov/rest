@@ -20,7 +20,6 @@
 _extra/
 vendor/
 logs/
-*.log
 
 TODO
 LAST_BUILD
