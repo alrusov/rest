@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/alrusov/cache"
@@ -406,8 +407,9 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 	// Добавляем общие поля в начало
 
 	if len(commonVals) > 0 {
-		for i := range fieldVals {
-			fieldVals[i] = append(commonVals, fieldVals[i]...)
+		for i, fv := range fieldVals {
+			fieldVals[i] = append(slices.Clone(commonVals), fv...)
+
 		}
 	}
 
