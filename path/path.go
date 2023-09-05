@@ -793,13 +793,17 @@ func (p *Params) typeFlatModelIterator(base string, model *misc.StringMap, t ref
 func (p *Params) ExtractFieldsFromBody(body []byte) (fieldsSlice []misc.InterfaceMap, msgs *misc.Messages, err error) {
 	msgs = misc.NewMessages()
 
-	if p.Request.FlatModel == nil || len(p.Request.FlatModel) == 0 {
+	if len(body) == 0 {
+		err = fmt.Errorf("empty body")
+		return
+	}
+
+	if p.Request.FlatModel == nil {
 		err = fmt.Errorf("chain doesn't have a request body")
 		return
 	}
 
-	if len(body) == 0 {
-		err = fmt.Errorf("empty body")
+	if len(p.Request.FlatModel) == 0 {
 		return
 	}
 
