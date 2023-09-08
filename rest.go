@@ -514,17 +514,40 @@ func (proc *ProcOptions) Delete() (result any, code int, err error) {
 		return
 	}
 
-	var execResult sql.Result
-	execResult, err = db.Exec(proc.Info.DBtype, proc.DBqueryName, proc.DBqueryVars)
+	res := &ExecResult{}
+
+	returnsObj := []struct {
+		Count uint64 `db:"count"`
+	}{}
+
+	if proc.ChainLocal.Params.Flags&path.FlagCreateReturnsObject == 0 {
+		returnsObj = nil
+	}
+
+	// Делаем запрос
+
+	var stdExecResult sql.Result
+	stdExecResult, err = db.ExecEx(proc.Info.DBtype, &returnsObj, proc.DBqueryName, db.PatternTypeNone, 0, nil, proc.DBqueryVars)
 	if err != nil {
 		code = http.StatusInternalServerError
 		return
 	}
 
-	n, _ := execResult.RowsAffected()
-	proc.ExecResult = &ExecResult{
-		AffectedRows: uint64(n),
+	if returnsObj != nil {
+		if len(returnsObj) == 0 {
+			Log.Message(log.NOTICE, "[%d] empty query result received", proc.ID)
+		}
+		res.AffectedRows = returnsObj[0].Count
+	} else {
+		n, err := stdExecResult.RowsAffected()
+		if err != nil {
+			Log.Message(log.NOTICE, "[%d] RowsAffected: %s", proc.ID, err)
+		} else {
+			res.AffectedRows = uint64(n)
+		}
 	}
+
+	proc.ExecResult = res
 
 	result, code, err = proc.after()
 	if err != nil {
