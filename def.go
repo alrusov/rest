@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"slices"
 	"sync"
 	"time"
 
@@ -275,6 +276,22 @@ func FindSubstArg(vars []any, name string) (subst *db.SubstArg) {
 		case *db.SubstArg:
 			if vv.Name() == name {
 				subst = vv
+				return
+			}
+		}
+	}
+
+	return
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func DelSubstArg(vars []any, name string) (result []any) {
+	for i, v := range vars {
+		switch vv := v.(type) {
+		case *db.SubstArg:
+			if vv.Name() == name {
+				result = slices.Delete(vars, i, i+1)
 				return
 			}
 		}
