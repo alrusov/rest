@@ -1,6 +1,6 @@
 module github.com/alrusov/rest/v3
 
-go 1.21.1
+go 1.21.3
 
 require (
 	github.com/alrusov/cache v0.1.3

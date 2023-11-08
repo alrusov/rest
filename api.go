@@ -312,6 +312,8 @@ func (proc *ProcOptions) parseQueryParams(src url.Values) (err error) {
 		return
 	}
 
+	proc.QueryParamsFound = make(misc.BoolMap, len(src))
+
 	proc.QueryParams = reflect.New(proc.ChainLocal.Params.QueryParamsType).Interface()
 	paramsT := proc.ChainLocal.Params.QueryParamsType
 	paramsV := reflect.ValueOf(proc.QueryParams).Elem()
@@ -330,6 +332,8 @@ func (proc *ProcOptions) parseQueryParams(src url.Values) (err error) {
 			}
 			continue
 		}
+
+		proc.QueryParamsFound[name] = true
 
 		ln := len(val)
 		field := paramsV.FieldByName(name)
