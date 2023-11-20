@@ -94,16 +94,16 @@ func HandlerEx(find FindModule, extra any, h *stdhttp.HTTP, id uint64, prefix st
 
 	if len(proc.RawBody) != 0 && requestObject.Pattern != nil {
 		proc.RawBody = bytes.TrimSpace(proc.RawBody)
-		if len(proc.RawBody) > 0 && proc.RawBody[0] != '[' {
-			proc.RawBody = bytes.Join([][]byte{{'['}, proc.RawBody, {']'}}, []byte{})
-		}
-
 		proc.RequestParams = reflect.New(
 			reflect.SliceOf(requestObject.Type),
 		).Interface()
 
 		switch requestObject.ContentType {
 		case stdhttp.ContentTypeJSON:
+			if len(proc.RawBody) > 0 && proc.RawBody[0] != '[' {
+				proc.RawBody = bytes.Join([][]byte{{'['}, proc.RawBody, {']'}}, []byte{})
+			}
+
 			err = jsonw.Unmarshal(proc.RawBody, &proc.RequestParams)
 			if err != nil {
 				code = http.StatusBadRequest

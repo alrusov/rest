@@ -521,10 +521,15 @@ func (proc *processor) scanChains(chains *path.Set, urlPath string, info *rest.I
 			}
 
 			if requestSchema != nil {
+				enc := chain.Params.Request.ContentType
+				if enc == "" {
+					enc = "application/json"
+				}
+
 				op.RequestBody = &oa.RequestBodyRef{
 					Value: &oa.RequestBody{
 						Content: oa.Content{
-							"application/json": &oa.MediaType{
+							enc: &oa.MediaType{
 								Schema: requestSchema,
 							},
 						},
@@ -533,12 +538,17 @@ func (proc *processor) scanChains(chains *path.Set, urlPath string, info *rest.I
 			}
 
 			if responseSchema != nil {
+				enc := chain.Params.Response.ContentType
+				if enc == "" {
+					enc = "application/json"
+				}
+
 				op.AddResponse(http.StatusOK,
 					&oa.Response{
 						Description: &okStr,
 						Headers:     responseHeaders,
 						Content: oa.Content{
-							"application/json": &oa.MediaType{
+							enc: &oa.MediaType{
 								Schema: responseSchema,
 							},
 						},
