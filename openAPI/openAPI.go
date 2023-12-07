@@ -126,7 +126,7 @@ func Compose(logFacility *log.Facility, cfg *Config, httpCfg *config.Listener, p
 			chains := info.Methods
 			if chains == nil {
 				//параметры!
-				proc.result.Paths.Map()[urlPath] = pi
+				proc.result.Paths.Set(urlPath, pi)
 				return
 			}
 
@@ -230,7 +230,7 @@ func (proc *processor) prepare() (err error) {
 			},
 			Version: oaCfg.Version,
 		},
-		Paths:    &oa.Paths{},
+		Paths:    oa.NewPaths(),
 		Security: *oa.NewSecurityRequirements(),
 		Servers:  servers,
 		//ExternalDocs: &oa.ExternalDocs{},
@@ -480,8 +480,8 @@ func (proc *processor) scanChains(chains *path.Set, urlPath string, info *rest.I
 
 			// Ищем сохраненный путь, если его нет - создаем
 
-			pi, exists := proc.result.Paths.Map()[urlPath]
-			if !exists {
+			pi := proc.result.Paths.Value(urlPath)
+			if pi == nil {
 				pathDescr := info.Summary
 				if len(pathParams) != 0 {
 					pathDescr = fmt.Sprintf("%s. Разбор пути: %s", pathDescr, pathExpr)
@@ -490,7 +490,7 @@ func (proc *processor) scanChains(chains *path.Set, urlPath string, info *rest.I
 					Summary:     info.Summary,
 					Description: pathDescr,
 				}
-				proc.result.Paths.Map()[urlPath] = pi
+				proc.result.Paths.Set(urlPath, pi)
 			}
 
 			// Создаем OperationID
