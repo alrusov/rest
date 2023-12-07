@@ -130,7 +130,8 @@ const (
 
 	// Имена тегов полей в описании query параметров
 	TagJSON     = "json"
-	TagDB       = "db"
+	TagDB       = db.TagDB
+	TagDBAlt    = db.TagDBAlt
 	TagSample   = "sample"
 	TagComment  = "comment"
 	TagRequired = "required"
@@ -685,7 +686,7 @@ var (
 func (p *Params) MakeTypeFlatModel() (err error) {
 	p.Request.FlatModel = make(misc.StringMap, 64)
 
-	err = p.typeFlatModelIterator("", &p.Request.FlatModel, p.Request.Type)
+	err = p.typeFlatModelIterator(db.Tag(), "", &p.Request.FlatModel, p.Request.Type)
 	if err != nil {
 		return
 	}
@@ -693,7 +694,8 @@ func (p *Params) MakeTypeFlatModel() (err error) {
 	return
 }
 
-func (p *Params) typeFlatModelIterator(base string, model *misc.StringMap, t reflect.Type) (err error) {
+func (p *Params) typeFlatModelIterator(tagDB string, base string, model *misc.StringMap, t reflect.Type) (err error) {
+
 	if t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
@@ -712,9 +714,9 @@ func (p *Params) typeFlatModelIterator(base string, model *misc.StringMap, t ref
 			continue
 		}
 
-		dbName := misc.StructTagName(&f, TagDB)
+		dbName := misc.StructTagName(&f, tagDB)
 		if dbName == "-" {
-			dbTags := misc.StructTagOpts(&f, TagDB)
+			dbTags := misc.StructTagOpts(&f, tagDB)
 			if dbName = dbTags["clean"]; dbName == "" {
 				continue
 			}
@@ -750,7 +752,7 @@ func (p *Params) typeFlatModelIterator(base string, model *misc.StringMap, t ref
 
 		case reflect.Struct:
 			if _, exists := specialTypes[f.Type.String()]; !exists {
-				err = p.typeFlatModelIterator(fName, model, f.Type)
+				err = p.typeFlatModelIterator(tagDB, fName, model, f.Type)
 				if err != nil {
 					return
 				}

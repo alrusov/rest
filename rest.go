@@ -517,7 +517,7 @@ func (proc *ProcOptions) Delete() (result any, code int, err error) {
 	res := &ExecResult{}
 
 	returnsObj := []struct {
-		Count uint64 `db:"count"`
+		Count uint64 `dbAlt:"count" db:"count"`
 	}{}
 
 	if proc.ChainLocal.Params.Flags&path.FlagCreateReturnsObject == 0 {
@@ -536,8 +536,9 @@ func (proc *ProcOptions) Delete() (result any, code int, err error) {
 	if returnsObj != nil {
 		if len(returnsObj) == 0 {
 			Log.Message(log.NOTICE, "[%d] empty query result received", proc.ID)
+		} else {
+			res.AffectedRows = returnsObj[0].Count
 		}
-		res.AffectedRows = returnsObj[0].Count
 	} else {
 		n, err := stdExecResult.RowsAffected()
 		if err != nil {
