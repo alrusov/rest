@@ -68,7 +68,7 @@ func HandlerEx(find FindModule, extra any, h *stdhttp.HTTP, id uint64, prefix st
 	proc.Chain, proc.PathParams, result, code, err = module.Info.Methods.Find(r.Method, tail)
 
 	if err != nil || code != 0 || result != nil {
-		proc.reply(code, result, err)
+		proc.reply(result, code, err)
 		return
 	}
 
@@ -80,7 +80,7 @@ func HandlerEx(find FindModule, extra any, h *stdhttp.HTTP, id uint64, prefix st
 	// Получаем тело запроса (в разжатом виде, если оно было gz)
 	bodyBuf, code, err := stdhttp.ReadRequestBody(r)
 	if err != nil {
-		proc.reply(code, nil, err)
+		proc.reply(nil, code, err)
 		return
 	}
 
@@ -107,7 +107,7 @@ func HandlerEx(find FindModule, extra any, h *stdhttp.HTTP, id uint64, prefix st
 			err = jsonw.Unmarshal(proc.RawBody, &proc.RequestParams)
 			if err != nil {
 				code = http.StatusBadRequest
-				proc.reply(code, result, err)
+				proc.reply(result, code, err)
 				return
 			}
 		}
@@ -117,7 +117,7 @@ func HandlerEx(find FindModule, extra any, h *stdhttp.HTTP, id uint64, prefix st
 	err = proc.parseQueryParams(r.URL.Query())
 	if err != nil {
 		code = http.StatusBadRequest
-		proc.reply(code, result, err)
+		proc.reply(result, code, err)
 		return
 	}
 
@@ -128,7 +128,7 @@ func HandlerEx(find FindModule, extra any, h *stdhttp.HTTP, id uint64, prefix st
 	result, code, err = proc.rest()
 
 	if err != nil {
-		proc.reply(code, result, err)
+		proc.reply(result, code, err)
 		return
 	}
 
@@ -137,7 +137,7 @@ func HandlerEx(find FindModule, extra any, h *stdhttp.HTTP, id uint64, prefix st
 		return
 	}
 
-	proc.reply(code, result, err)
+	proc.reply(result, code, err)
 
 	return
 }
@@ -189,7 +189,11 @@ func findModule(path string) (module *Module, basePath string, extraPath []strin
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-func (proc *ProcOptions) reply(code int, result any, err error) {
+func (proc *ProcOptions) reply(result any, code int, err error) {
+	if err != nil && proc.Info.Error != nil {
+		result, code, err = proc.Info.Error(proc, result, code, err)
+	}
+
 	readyAnswer := false
 
 	switch code {

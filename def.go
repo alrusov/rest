@@ -32,7 +32,7 @@ type (
 		// Если code<0, то result содержит готовый ответ в []byte, отсылаем как есть с кодом -code
 		Before(proc *ProcOptions) (result any, code int, err error)
 
-		// Вызывается почле обращения к базе, используется, например, для обогащения результата
+		// Вызывается после обращения к базе, используется, например, для обогащения результата
 		// Если возвращает code != 0 или result != nil, то они и будут результатом
 		// Если code<0, то result содержит готовый ответ в []byte, отсылаем как есть с кодом -code
 		After(proc *ProcOptions) (result any, code int, err error)
@@ -41,6 +41,7 @@ type (
 	FuncInit   func(info *Info) (err error)
 	FuncBefore func(proc *ProcOptions) (result any, code int, err error)
 	FuncAfter  func(proc *ProcOptions) (result any, code int, err error)
+	FuncError  func(proc *ProcOptions, result0 any, code0 int, err0 error) (result any, code int, err error)
 
 	// Информация о методе
 	Info struct {
@@ -57,6 +58,7 @@ type (
 		Init        FuncInit   // User defined Init
 		Before      FuncBefore // User defined Before query
 		After       FuncAfter  // User defined After query
+		Error       FuncError  // User defined error handler
 	}
 
 	// Опции запроса к методу
