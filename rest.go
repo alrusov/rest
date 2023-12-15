@@ -1,7 +1,6 @@
 package rest
 
 import (
-	"database/sql"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -454,30 +453,36 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 
 	// Делаем запрос
 
-	var stdExecResult sql.Result
+	var stdExecResult *db.Result
 	stdExecResult, err = db.ExecEx(proc.Info.DBtype, returnsObj, proc.DBqueryName, patternType, startIdx, fieldNames, proc.DBqueryVars)
 	if err != nil {
 		code = http.StatusInternalServerError
 		return
 	}
 
-	if returnsObj != nil {
-		res.AffectedRows = uint64(len(res.Rows))
+	n, err := stdExecResult.RowsAffected()
+	if err != nil {
+		Log.Message(log.NOTICE, "[%d] RowsAffected: %s", proc.ID, err)
 	} else {
-		n, err := stdExecResult.RowsAffected()
-		if err != nil {
-			Log.Message(log.NOTICE, "[%d] RowsAffected: %s", proc.ID, err)
-		} else {
-			res.AffectedRows = uint64(n)
+		res.AffectedRows = uint64(n)
+	}
+
+	e := stdExecResult.Errors()
+	if len(e) > 0 && res.Rows == nil {
+		res.Rows = make([]ExecResultRow, len(e))
+	}
+
+	for i, e := range e {
+		if e == nil {
+			continue
 		}
 
-		if !forUpdate {
-			lastID, err := stdExecResult.LastInsertId()
-			if err != nil {
-				Log.Message(log.NOTICE, "[%d] LastInsertId: %s", proc.ID, err)
-			} else {
-				res.Rows = []ExecResultRow{{ID: uint64(lastID)}}
-			}
+		m := e.Error()
+		proc.Notices.Add(m)
+
+		if i < len(res.Rows) {
+			res.Rows[i].Messages = []string{m}
+			res.Rows[i].Error = e
 		}
 	}
 
@@ -526,9 +531,17 @@ func (proc *ProcOptions) Delete() (result any, code int, err error) {
 
 	// Делаем запрос
 
-	var stdExecResult sql.Result
+	var stdExecResult *db.Result
 	stdExecResult, err = db.ExecEx(proc.Info.DBtype, &returnsObj, proc.DBqueryName, db.PatternTypeNone, 0, nil, proc.DBqueryVars)
 	if err != nil {
+		e := err
+		ee := stdExecResult.Errors()
+		if len(ee) > 0 {
+			e = ee[0]
+		}
+		res.Rows = []ExecResultRow{{Error: e}}
+		proc.ExecResult = res
+		result = proc.ExecResult
 		code = http.StatusInternalServerError
 		return
 	}

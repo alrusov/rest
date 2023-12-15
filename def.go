@@ -38,27 +38,27 @@ type (
 		After(proc *ProcOptions) (result any, code int, err error)
 	}
 
-	FuncInit   func(info *Info) (err error)
-	FuncBefore func(proc *ProcOptions) (result any, code int, err error)
-	FuncAfter  func(proc *ProcOptions) (result any, code int, err error)
-	FuncError  func(proc *ProcOptions, result0 any, code0 int, err0 error) (result any, code int, err error)
+	FuncInit        func(info *Info) (err error)
+	FuncBefore      func(proc *ProcOptions) (result any, code int, err error)
+	FuncAfter       func(proc *ProcOptions) (result any, code int, err error)
+	FuncResultTuner func(proc *ProcOptions, result0 any, code0 int, err0 error) (result any, code int, err error)
 
 	// Информация о методе
 	Info struct {
-		Path        string     // Относительный (от базового) путь в URL
-		Name        string     // Имя, желательно  чтобы по правилам имен переменных
-		Summary     string     // Краткое описание
-		Description string     // Описание, по умолчанию сформированное из Summary и query параметров
-		Tags        []string   // Имена тегов для группировки
-		Flags       path.Flags // Флаги
-		Methods     *path.Set  // Цепочки обработки
-		Config      any        // Кастомные параметры в конфиг файле
-		DBtype      string     // Тип базы. Если пусто, то по умолчанию из конфига
-		QueryPrefix string     // Префикс имени запроса в базу
-		Init        FuncInit   // User defined Init
-		Before      FuncBefore // User defined Before query
-		After       FuncAfter  // User defined After query
-		Error       FuncError  // User defined error handler
+		Path        string          // Относительный (от базового) путь в URL
+		Name        string          // Имя, желательно  чтобы по правилам имен переменных
+		Summary     string          // Краткое описание
+		Description string          // Описание, по умолчанию сформированное из Summary и query параметров
+		Tags        []string        // Имена тегов для группировки
+		Flags       path.Flags      // Флаги
+		Methods     *path.Set       // Цепочки обработки
+		Config      any             // Кастомные параметры в конфиг файле
+		DBtype      string          // Тип базы. Если пусто, то по умолчанию из конфига
+		QueryPrefix string          // Префикс имени запроса в базу
+		Init        FuncInit        // User defined Init
+		Before      FuncBefore      // User defined Before query
+		After       FuncAfter       // User defined After query
+		ResultTuner FuncResultTuner // The last step result tuner
 	}
 
 	// Опции запроса к методу
@@ -111,14 +111,16 @@ type (
 	}
 
 	ExecResult struct {
-		AffectedRows uint64          `json:"affectedRows,omitempty" comment:"Количеcтво затронутых записей"`
+		AffectedRows uint64          `json:"affectedRows" comment:"Количеcтво затронутых записей"`
 		Rows         []ExecResultRow `json:"rows,omitempty" comment:"Созданные записи" ref:"execResultRow"`
-		Notice       string          `json:"notice,omitempty" comment:"Предупреждения и замечания"`
+		Notice       string          `json:"notice,omitempty" comment:"Сообщения"`
 	}
 
 	ExecResultRow struct {
-		ID   uint64 `json:"id,omitempty" comment:"ID созданной записи"`
-		GUID string `json:"guid,omitempty" comment:"GUID созданной записи"`
+		ID       uint64   `json:"id,omitempty" comment:"ID созданной записи"`
+		GUID     string   `json:"guid,omitempty" comment:"GUID созданной записи"`
+		Messages []string `json:"messages,omitempty" comment:"Сообщения"`
+		Error    error    `json:"-"`
 	}
 
 	Tags []*Tag

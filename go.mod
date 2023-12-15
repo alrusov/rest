@@ -5,7 +5,7 @@ go 1.21.4
 require (
 	github.com/alrusov/cache v0.1.3
 	github.com/alrusov/config v0.1.57
-	github.com/alrusov/db v0.1.40
+	github.com/alrusov/db v0.1.41
 	github.com/alrusov/jsonw v0.1.3
 	github.com/alrusov/log v0.1.37
 	github.com/alrusov/misc v1.1.11

@@ -190,8 +190,8 @@ func findModule(path string) (module *Module, basePath string, extraPath []strin
 //----------------------------------------------------------------------------------------------------------------------------//
 
 func (proc *ProcOptions) reply(result any, code int, err error) {
-	if err != nil && proc.Info.Error != nil {
-		result, code, err = proc.Info.Error(proc, result, code, err)
+	if proc.Info.ResultTuner != nil {
+		result, code, err = proc.Info.ResultTuner(proc, result, code, err)
 	}
 
 	readyAnswer := false
