@@ -117,10 +117,10 @@ type (
 	}
 
 	ExecResultRow struct {
-		ID       uint64   `json:"id,omitempty" comment:"ID созданной записи"`
-		GUID     string   `json:"guid,omitempty" comment:"GUID созданной записи"`
-		Messages []string `json:"messages,omitempty" comment:"Сообщения"`
-		Error    error    `json:"-"`
+		ID      uint64 `json:"id,omitempty" comment:"ID созданной записи"`
+		GUID    string `json:"guid,omitempty" comment:"GUID созданной записи"`
+		Message string `json:"message,omitempty" comment:"Сообщения"`
+		err     error  `json:"-"`
 	}
 
 	Tags []*Tag
@@ -309,6 +309,45 @@ func DelSubstArg(vars []any, name string) (result []any) {
 	}
 
 	return
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func (r *ExecResult) Error() (err error) {
+	if len(r.Rows) == 0 {
+		return
+	}
+
+	msgs := misc.NewMessages()
+
+	for i, row := range r.Rows {
+		if row.err == nil {
+			continue
+		}
+
+		msgs.Add(fmt.Sprintf("[%d] %s", i, row.err))
+	}
+
+	return msgs.Error()
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func (r *ExecResult) AddRow(row ExecResultRow) {
+	r.Rows = append(r.Rows, row)
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func (r *ExecResultRow) SetError(err error) {
+	r.err = err
+	r.Message = err.Error()
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func (r *ExecResultRow) Error() (err error) {
+	return r.err
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//

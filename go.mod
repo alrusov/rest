@@ -1,6 +1,6 @@
 module github.com/alrusov/rest/v3
 
-go 1.21.4
+go 1.21.5
 
 require (
 	github.com/alrusov/cache v0.1.3
@@ -8,7 +8,7 @@ require (
 	github.com/alrusov/db v0.1.41
 	github.com/alrusov/jsonw v0.1.3
 	github.com/alrusov/log v0.1.37
-	github.com/alrusov/misc v1.1.11
+	github.com/alrusov/misc v1.1.12
 	github.com/alrusov/stdhttp v0.1.116
 	github.com/getkin/kin-openapi v0.122.0
 )

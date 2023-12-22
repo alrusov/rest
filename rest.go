@@ -408,7 +408,6 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 	if len(commonVals) > 0 {
 		for i, fv := range fieldVals {
 			fieldVals[i] = append(slices.Clone(commonVals), fv...)
-
 		}
 	}
 
@@ -468,7 +467,7 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 	}
 
 	e := stdExecResult.Errors()
-	if len(e) > 0 && res.Rows == nil {
+	if len(e) > 0 && len(res.Rows) == 0 {
 		res.Rows = make([]ExecResultRow, len(e))
 	}
 
@@ -477,12 +476,10 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 			continue
 		}
 
-		m := e.Error()
-		proc.Notices.Add(m)
+		proc.Notices.Add(e.Error())
 
 		if i < len(res.Rows) {
-			res.Rows[i].Messages = []string{m}
-			res.Rows[i].Error = e
+			res.Rows[i].SetError(e)
 		}
 	}
 
@@ -539,7 +536,9 @@ func (proc *ProcOptions) Delete() (result any, code int, err error) {
 		if len(ee) > 0 {
 			e = ee[0]
 		}
-		res.Rows = []ExecResultRow{{Error: e}}
+		r := ExecResultRow{}
+		r.SetError(e)
+		res.AddRow(r)
 		proc.ExecResult = res
 		result = proc.ExecResult
 		code = http.StatusInternalServerError
