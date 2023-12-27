@@ -839,16 +839,16 @@ func (proc *processor) makeObjectSchema(topName string, t reflect.Type, withoutR
 				return nil
 			}
 
-			if withoutReadOnly {
-				readonly := field.Tag.Get(path.TagReadonly)
-				if readonly == "true" {
+			if name == "" {
+				name = misc.StructTagName(field, path.TagJSON)
+				if name == "-" {
 					return nil
 				}
 			}
 
-			if name == "" {
-				name = misc.StructTagName(field, path.TagJSON)
-				if name == "-" {
+			if withoutReadOnly {
+				readonly := field.Tag.Get(path.TagReadonly)
+				if readonly == "true" {
 					return nil
 				}
 			}
@@ -1005,6 +1005,13 @@ func (proc *processor) scanObject(parentList *misc.BoolMap, parent *oa.SchemaRef
 
 		if misc.StructTagName(&field, path.TagJSON) == "-" {
 			continue
+		}
+
+		if withoutReadOnly {
+			readonly := field.Tag.Get(path.TagReadonly)
+			if readonly == "true" {
+				continue
+			}
 		}
 
 		fType := field.Type
