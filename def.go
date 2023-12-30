@@ -45,20 +45,22 @@ type (
 
 	// Информация о методе
 	Info struct {
-		Path        string          // Относительный (от базового) путь в URL
-		Name        string          // Имя, желательно  чтобы по правилам имен переменных
-		Summary     string          // Краткое описание
-		Description string          // Описание, по умолчанию сформированное из Summary и query параметров
-		Tags        []string        // Имена тегов для группировки
-		Flags       path.Flags      // Флаги
-		Methods     *path.Set       // Цепочки обработки
-		Config      any             // Кастомные параметры в конфиг файле
-		DBtype      string          // Тип базы. Если пусто, то по умолчанию из конфига
-		QueryPrefix string          // Префикс имени запроса в базу
-		Init        FuncInit        // User defined Init
-		Before      FuncBefore      // User defined Before query
-		After       FuncAfter       // User defined After query
-		ResultTuner FuncResultTuner // The last step result tuner
+		Path           string          // Относительный (от базового) путь в URL
+		Name           string          // Имя, желательно  чтобы по правилам имен переменных
+		Summary        string          // Краткое описание
+		Description    string          // Описание, по умолчанию сформированное из Summary и query параметров
+		Tags           []string        // Имена тегов для группировки
+		Flags          path.Flags      // Флаги
+		Methods        *path.Set       // Цепочки обработки
+		Config         any             // Кастомные параметры в конфиг файле
+		DBtype         string          // Тип базы. Если пусто, то по умолчанию из конфига
+		QueryPrefix    string          // Префикс имени запроса в базу
+		Init           FuncInit        // User defined Init
+		Before         FuncBefore      // User defined Before query
+		After          FuncAfter       // User defined After query
+		shaperQueueLen int             // Shaper queue length, 0 - direct mode (without shaper)
+		shaperQueue    chan *shaper    // Shaper queue
+		ResultTuner    FuncResultTuner // The last step result tuner
 	}
 
 	// Опции запроса к методу
