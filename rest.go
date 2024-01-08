@@ -195,7 +195,7 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 	fields := make([]string, len(f))
 	copy(fields, f)
 
-	compressionNeeded := false
+	withSkippedFields := false
 
 	if len(proc.Fields) != 0 { // В стандартном случае должно быть 0 или 1
 		src := proc.ChainLocal.Params.DBFields.AllDbNames()
@@ -203,7 +203,7 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 		for i, name := range src {
 			if _, exists := proc.Fields[0][name]; !exists {
 				fields[i] = ""
-				compressionNeeded = true
+				withSkippedFields = true
 			}
 		}
 	}
@@ -218,12 +218,12 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 
 			if _, exists := proc.ExcludedFields[name]; exists {
 				fields[i] = ""
-				compressionNeeded = true
+				withSkippedFields = true
 			}
 		}
 	}
 
-	if compressionNeeded {
+	if withSkippedFields {
 		dstI := 0
 
 		for srcI, name := range fields {
@@ -254,13 +254,15 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 	)
 
 	for {
-		srcTp := proc.ChainLocal.Params.Response.SrcType
-		if srcTp == nil {
-			srcTp = proc.ChainLocal.Params.Response.Type
-		}
-		proc.DBqueryResult = reflect.New(reflect.SliceOf(srcTp)).Interface()
+		if proc.ResultAsRows {
+			err = db.Query(proc.Info.DBtype, &proc.DBqueryRows, proc.DBqueryName, fields, proc.DBqueryVars)
+		} else {
+			srcTp := proc.responseSouceType()
+			proc.DBqueryResult = reflect.New(reflect.SliceOf(srcTp)).Interface()
 
-		err = db.Query(proc.Info.DBtype, proc.DBqueryResult, proc.DBqueryName, fields, proc.DBqueryVars)
+			err = db.Query(proc.Info.DBtype, proc.DBqueryResult, proc.DBqueryName, fields, proc.DBqueryVars)
+		}
+
 		if err != nil {
 			code = http.StatusInternalServerError
 			return

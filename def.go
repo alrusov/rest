@@ -17,6 +17,7 @@ import (
 	"github.com/alrusov/misc"
 	path "github.com/alrusov/rest/v3/path"
 	"github.com/alrusov/stdhttp"
+	"github.com/jmoiron/sqlx"
 )
 
 //----------------------------------------------------------------------------------------------------------------------------//
@@ -86,7 +87,9 @@ type (
 		RequestParams    any                 // Request параметры
 		DBqueryName      string              // Имя запроса к базе данных
 		DBqueryVars      []any               // Переменные для формирования запроса
-		DBqueryResult    any                 // Результат выполненения запроса (слайс)
+		ResultAsRows     bool                // Возвращать для GET не готовый результат, а *sqlx.Rows, чтобы производить разбор самостоятельно. Актуально для больших результатов.
+		DBqueryResult    any                 // Результат выполненения запроса (указатель на слайс) при ResultAsRows==false
+		DBqueryRows      *sqlx.Rows          // Результат при ResultAsRows==true
 		Fields           []misc.InterfaceMap // Поля (имя из sql запроса) для insert или update. Для select - список полей для выборки из базы, если нужны не все из объекта
 		ExcludedFields   misc.StringMap      // Поля ([name]db_name), которые надо исключить из запроса
 		Notices          *misc.Messages      // Предупреждения и замечания обработчика
@@ -146,8 +149,6 @@ const (
 	FlagLogUnknownParams   = 0x00000001 // Логировать полученные query параметры, которые не описаны в методе
 	FlagConvertReplyToJSON = 0x00000008 // Конвертировать ответ в json? Если он будет заранее подготовлен уже в таком формате, то НЕ СТАВИТЬ этот флаг!
 
-	StatusProcessed = 999 // Специальный тип возврата, говорящий о том, что уже все ответы отправлены
-
 	// Использовать по возможности стандартные имена!
 	ParamCount      = "count"
 	ParamPeriodFrom = "from" // включая
@@ -192,7 +193,8 @@ const (
 	DefaultMaxCount  = 10000
 	DefaultMaxPeriod = config.Duration(3600 * time.Second)
 
-	StatusRetry = 999 // Специальный http status, возвращаемый из After для повторного выполнения GET запроса (с возможно измененными там параметрами)
+	StatusProcessed = 999 // Специальный http status, говорящий о том, что все ответы уже отправлены
+	StatusRetry     = 998 // Специальный http status, возвращаемый из After для повторного выполнения GET запроса (с возможно измененными там параметрами)
 )
 
 //----------------------------------------------------------------------------------------------------------------------------//

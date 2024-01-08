@@ -246,10 +246,7 @@ func (proc *ProcOptions) reply(result any, code int, err error) {
 	}
 
 	var data []byte
-	contentType := stdhttp.ContentTypeJSON
-	if proc.Chain != nil && proc.ChainLocal.Params.Response.ContentType != "" {
-		contentType = proc.ChainLocal.Params.Response.ContentType
-	}
+	contentType := proc.httpContentType()
 
 	if readyAnswer {
 		var ok bool
@@ -306,6 +303,27 @@ func (proc *ProcOptions) reply(result any, code int, err error) {
 	if err != nil {
 		proc.LogFacility.Message(log.NOTICE, "[%d] WriteReply error: %s", proc.ID, err)
 	}
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func (proc *ProcOptions) httpContentType() (tp string) {
+	tp = stdhttp.ContentTypeJSON
+	if proc.Chain != nil && proc.ChainLocal.Params.Response.ContentType != "" {
+		tp = proc.ChainLocal.Params.Response.ContentType
+	}
+
+	return
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func (proc *ProcOptions) responseSouceType() (tp reflect.Type) {
+	tp = proc.ChainLocal.Params.Response.SrcType
+	if tp == nil {
+		tp = proc.ChainLocal.Params.Response.Type
+	}
+	return
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//
