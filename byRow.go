@@ -16,22 +16,28 @@ import (
 
 type (
 	ByRow struct {
-		Begin     []byte         // Пишется один раз в начале
-		End       []byte         // Пишется один раз в конце
-		Delimiter []byte         // Разделитель строк
-		Prefix    []byte         // Дополнительный блок цикла, который может возвращаться из ByRowTuner и пишется один раз перед основными данными
-		Data      []any          // Основные данные цикла
-		Suffix    []byte         // Дополнительный блок цикла, который может возвращаться из ByRowTuner и пишется один раз после основных данных
-		RowNum    int            // Количество выданных строк (увеличивается в конце обработки строки)
-		IsFinal   bool           // Финал, Tuner еще раз вызывается после завершения выборки, в первом параметре опять последнее значение
-		proc      *ProcOptions   //
-		tuner     ByRowTuner     //
-		withGzip  bool           //
-		blockNum  int            //
-		failed    bool           //
-		last      any            //
-		buf       *bytes.Buffer  //
-		writer    io.WriteCloser //
+		Begin []byte // Пишется один раз в начале
+		End   []byte // Пишется один раз в конце
+
+		Data []RowData
+
+		RowNum   int            // Количество выданных строк (увеличивается в конце обработки строки)
+		IsFinal  bool           // Финал, Tuner еще раз вызывается после завершения выборки, в первом параметре опять последнее значение
+		proc     *ProcOptions   //
+		tuner    ByRowTuner     //
+		withGzip bool           //
+		blockNum int            //
+		failed   bool           //
+		last     any            //
+		buf      *bytes.Buffer  //
+		writer   io.WriteCloser //
+	}
+
+	RowData struct {
+		Prefix    []byte // Дополнительный блок цикла, который может возвращаться из ByRowTuner и пишется перед основными данными
+		Suffix    []byte // Дополнительный блок цикла, который может возвращаться из ByRowTuner и пишется после основных данных
+		Delimiter []byte // Разделитель строк
+		Data      any    // Основные данные цикла
 	}
 
 	ByRowTuner func(br *ByRow, row any) (err error)
@@ -41,21 +47,26 @@ const (
 	blockBufferSize = 128 * 1024
 )
 
+var (
+	ByRowDefautlBegin     = []byte{'['}
+	ByRowDefautlEnd       = []byte{']'}
+	ByRowDefaultDelimiter = []byte{','}
+)
+
 //----------------------------------------------------------------------------------------------------------------------------//
 
 func NewByRow(proc *ProcOptions, tuner ByRowTuner) (br *ByRow, err error) {
 	br = &ByRow{
-		Begin:     []byte{'['},
-		End:       []byte{']'},
-		Delimiter: []byte{','},
-		RowNum:    0,
-		IsFinal:   false,
-		proc:      proc,
-		tuner:     tuner,
-		withGzip:  false,
-		blockNum:  0,
-		failed:    false,
-		buf:       new(bytes.Buffer),
+		Begin:    ByRowDefautlBegin,
+		End:      ByRowDefautlEnd,
+		RowNum:   0,
+		IsFinal:  false,
+		proc:     proc,
+		tuner:    tuner,
+		withGzip: false,
+		blockNum: 0,
+		failed:   false,
+		buf:      new(bytes.Buffer),
 	}
 
 	br.buf.Grow(blockBufferSize)
@@ -83,9 +94,6 @@ func (br *ByRow) Do() (err error) {
 	}
 	if len(br.End) == 0 {
 		br.End = nil
-	}
-	if len(br.Delimiter) == 0 {
-		br.Delimiter = nil
 	}
 
 	// Если нужен gzip, то добавляем упаковку
@@ -131,7 +139,14 @@ func (br *ByRow) Do() (err error) {
 		}
 
 		if br.tuner == nil {
-			br.Data = []any{r}
+			br.Data = []RowData{
+				{
+					Prefix:    nil,
+					Suffix:    nil,
+					Delimiter: ByRowDefaultDelimiter,
+					Data:      r,
+				},
+			}
 		} else {
 			// Кастомное преобразование
 			err = br.tuner(br, r)
@@ -140,64 +155,61 @@ func (br *ByRow) Do() (err error) {
 			}
 		}
 
-		if len(br.Data) == 0 && br.Prefix == nil && br.Suffix == nil {
+		if len(br.Data) == 0 {
 			// Писать нечего
 			continue
 		}
 
-		if br.RowNum > 0 {
-			// Пишем разделитель
-			if br.Delimiter != nil {
-				_, err = br.writer.Write(br.Delimiter)
-				if err != nil {
-					return
+		for i, rd := range br.Data {
+			if i > 0 || br.RowNum > 0 {
+				// Пишем разделитель
+				if rd.Delimiter != nil {
+					_, err = br.writer.Write(rd.Delimiter)
+					if err != nil {
+						return
+					}
 				}
-			}
-		} else if br.Begin != nil {
-			// Пишем начало результата
-			_, err = br.writer.Write(br.Begin)
-			if err != nil {
-				return
-			}
-		}
-
-		if br.Prefix != nil {
-			// Пишем префикс
-			_, err = br.writer.Write(br.Prefix)
-			if err != nil {
-				return
-			}
-			br.Prefix = nil
-		}
-
-		if len(br.Data) > 0 {
-			// Маршалим данные в json
-			var j []byte
-			for _, r := range br.Data {
-				j, err = jsonw.Marshal(r)
+			} else if br.Begin != nil {
+				// Пишем начало результата
+				_, err = br.writer.Write(br.Begin)
 				if err != nil {
 					return
 				}
 			}
 
-			br.Data = nil
+			if rd.Prefix != nil {
+				// Пишем префикс
+				_, err = br.writer.Write(rd.Prefix)
+				if err != nil {
+					return
+				}
+			}
 
-			// Пишем данные
-			_, err = br.writer.Write(j)
-			if err != nil {
-				return
+			if !misc.IsNil(rd.Data) {
+				// Маршалим данные в json
+				var j []byte
+				j, err = jsonw.Marshal(rd.Data)
+				if err != nil {
+					return
+				}
+
+				// Пишем данные
+				_, err = br.writer.Write(j)
+				if err != nil {
+					return
+				}
+			}
+
+			if rd.Suffix != nil {
+				// Пишем суффикс
+				_, err = br.writer.Write(rd.Suffix)
+				if err != nil {
+					return
+				}
 			}
 		}
 
-		if br.Suffix != nil {
-			// Пишем суффикс
-			_, err = br.writer.Write(br.Suffix)
-			if err != nil {
-				return
-			}
-			br.Suffix = nil
-		}
-
+		br.Data = nil
 		br.RowNum++
 	}
 
@@ -264,9 +276,11 @@ func (br *ByRow) Close() (err error) {
 		}
 	}
 
-	err = br.Flush()
-	if err != nil {
-		msgs.AddError(err)
+	if br.RowNum != 0 {
+		err = br.Flush()
+		if err != nil {
+			msgs.AddError(err)
+		}
 	}
 
 	err = msgs.Error()
