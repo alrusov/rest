@@ -589,6 +589,7 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 		return
 	}
 
+	res.Cleanup()
 	result = res
 
 	return

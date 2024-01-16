@@ -343,6 +343,18 @@ func (r *ExecResult) AddRow(row ExecResultRow) {
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
+func (r *ExecResult) Cleanup() {
+	for _, r := range r.Rows {
+		if !r.IsEmpty() {
+			return
+		}
+	}
+
+	r.Rows = nil
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
 func (r *ExecResultRow) SetError(err error) {
 	r.err = err
 	r.Message = err.Error()
@@ -352,6 +364,12 @@ func (r *ExecResultRow) SetError(err error) {
 
 func (r *ExecResultRow) Error() (err error) {
 	return r.err
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func (r *ExecResultRow) IsEmpty() bool {
+	return r.ID == 0 && r.GUID == "" && r.Message == "" && r.err == nil
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//
