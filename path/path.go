@@ -792,9 +792,7 @@ func (p *Params) typeFlatModelIterator(tagDB string, base string, model *misc.St
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-func (p *Params) ExtractFieldsFromBody(body []byte) (fieldsSlice []misc.InterfaceMap, msgs *misc.Messages, err error) {
-	msgs = misc.NewMessages()
-
+func (p *Params) ExtractFieldsFromBody(body []byte) (fieldsSlice []misc.InterfaceMap, allMessages [][]string, err error) {
 	if len(body) == 0 {
 		err = fmt.Errorf("empty body")
 		return
@@ -818,21 +816,20 @@ func (p *Params) ExtractFieldsFromBody(body []byte) (fieldsSlice []misc.Interfac
 
 	fieldsSlice = make([]misc.InterfaceMap, 0, len(data))
 
+	allMessages = make([][]string, len(data))
+
 	for i, objMap := range data {
 		fields := make(misc.InterfaceMap, len(p.Request.FlatModel))
-
-		err = p.extractFieldsFromBodyIterator("", &fields, objMap, msgs)
-		if err != nil {
-			err = fmt.Errorf("body[%d] %s", i, err)
-			return
+		messages := p.extractFieldsFromBodyIterator("", &fields, objMap)
+		if len(messages) > 0 {
+			allMessages[i] = messages
 		}
-
 		fieldsSlice = append(fieldsSlice, fields)
 	}
 	return
 }
 
-func (p *Params) extractFieldsFromBodyIterator(base string, fields *misc.InterfaceMap, m misc.InterfaceMap, msgs *misc.Messages) (err error) {
+func (p *Params) extractFieldsFromBodyIterator(base string, fields *misc.InterfaceMap, m misc.InterfaceMap) (messages []string) {
 	for fName, v := range m {
 		if base != "" {
 			fName = base + "." + fName
@@ -840,15 +837,15 @@ func (p *Params) extractFieldsFromBodyIterator(base string, fields *misc.Interfa
 
 		switch v := v.(type) {
 		case map[string]any:
-			err = p.extractFieldsFromBodyIterator(fName, fields, misc.InterfaceMap(v), msgs)
-			if err != nil {
-				return
+			m := p.extractFieldsFromBodyIterator(fName, fields, misc.InterfaceMap(v))
+			if len(m) > 0 {
+				messages = append(messages, m...)
 			}
 
 		default:
 			dbName, exists := p.Request.FlatModel[fName]
 			if !exists {
-				msgs.Add(`unknown field "%s"`, fName)
+				messages = append(messages, fmt.Sprintf(`unknown field "%s"`, fName))
 				continue
 			}
 			if dbName == "" {

@@ -19,6 +19,10 @@ func BadRequest(msg string, v ...any) (code int, err error) {
 	return codeAndError(http.StatusBadRequest, "bad request", msg, v...)
 }
 
+func UnprocessableEntity(msg string, v ...any) (code int, err error) {
+	return codeAndError(http.StatusUnprocessableEntity, "unprocessable entity", msg, v...)
+}
+
 func NotFound(msg string, v ...any) (code int, err error) {
 	return codeAndError(http.StatusNotFound, "not found", msg, v...)
 }

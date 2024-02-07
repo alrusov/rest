@@ -10,9 +10,8 @@ import (
 
 	"github.com/alrusov/cache"
 	"github.com/alrusov/db"
-	"github.com/alrusov/log"
 	"github.com/alrusov/misc"
-	path "github.com/alrusov/rest/v3/path"
+	path "github.com/alrusov/rest/v4/path"
 	"github.com/alrusov/stdhttp"
 )
 
@@ -315,171 +314,263 @@ func (proc *ProcOptions) Update() (result any, code int, err error) {
 }
 
 func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) {
-	res := &ExecResult{}
-	defer func() {
-		res.Notice = proc.Notices.String()
-	}()
+	execResult := &ExecResult{}
 
-	if proc.ChainLocal.Params.Flags&path.FlagRequestDontMakeFlatModel == 0 {
-		var msgs *misc.Messages
-		proc.Fields, msgs, err = proc.ChainLocal.Params.ExtractFieldsFromBody(proc.RawBody)
-		if msgs.Len() > 0 {
-			Log.Message(log.DEBUG, "[%d] %s", proc.ID, msgs.String())
-		}
-		if err != nil {
-			code = http.StatusBadRequest
+	defer func() {
+		if result != nil {
 			return
 		}
+
+		if err != nil {
+			if code == 0 {
+				code = http.StatusUnprocessableEntity
+			}
+
+			if len(execResult.Rows) == 0 {
+				r := &ExecResultRow{}
+				execResult.AddRow(r)
+			}
+
+			for _, r := range execResult.Rows {
+				r.Code = code
+				r.AddError(err)
+			}
+
+			execResult.TotalRows = uint64(len(execResult.Rows))
+			execResult.FailedRows = execResult.TotalRows
+		}
+
+		result = execResult
+		code = http.StatusMultiStatus
+	}()
+
+	err = proc.prepareFields(execResult)
+	if err != nil {
+		return
 	}
 
 	result, code, err = proc.before()
+	if code != 0 || result != nil || err != nil {
+		return
+	}
+
+	ok := proc.checkFields(forUpdate, execResult)
+	if !ok {
+		return
+	}
+
+	startIdx, fieldNames := proc.makeQueryVars(forUpdate)
+
+	// Тип шаблона запроса
+
+	patternType := db.PatternTypeInsert
+	if forUpdate {
+		patternType = db.PatternTypeUpdate
+	}
+
+	var returnsObj *[]*ExecResultRow
+	requestRes := &ExecResult{}
+
+	if !forUpdate && proc.ChainLocal.Params.Flags&path.FlagCreateReturnsObject != 0 {
+		// Get result from INSERT ... RETURNING id
+		returnsObj = &requestRes.Rows
+	}
+
+	// Делаем запрос
+
+	var stdExecResult *db.Result
+	stdExecResult, err = db.ExecEx(proc.Info.DBtype, returnsObj, proc.DBqueryName, patternType, startIdx, fieldNames, proc.DBqueryVars)
 	if err != nil {
-		if code == 0 {
-			code = http.StatusBadRequest
-		}
+		code = http.StatusInternalServerError
 		return
 	}
 
-	if code != 0 || result != nil {
-		return
-	}
+	execResult.TotalRows = uint64(len(proc.Fields))
 
-	// Check fields
-	if len(proc.Fields) > 0 {
-		var lacks []string
-		var requiredCounts misc.IntMap
-
-		rqLn := len(proc.ChainLocal.Params.Request.RequiredFields)
-		if rqLn > 0 {
-			lacks = make([]string, 0, rqLn)
-			requiredCounts = make(misc.IntMap, rqLn)
-
-			ln := len(proc.Fields)
-			for _, f := range proc.ChainLocal.Params.Request.RequiredFields {
-				requiredCounts[f] = ln
+	if stdExecResult.HasError() {
+		for i, e := range stdExecResult.Errors() {
+			if i > len(execResult.Rows) {
+				break
 			}
+
+			if e == nil {
+				continue
+			}
+
+			r := execResult.Rows[i]
+			r.Code = http.StatusInternalServerError
+			r.AddError(e)
+
+		}
+	}
+
+	if returnsObj != nil {
+		for i, src := range *returnsObj {
+			if i == len(execResult.Rows) {
+				break
+			}
+
+			r := execResult.Rows[i]
+
+			if src == nil {
+				r.Code = http.StatusInternalServerError
+				continue
+			}
+
+			r.ID = src.ID
+			r.GUID = src.GUID
+			r.Code = http.StatusOK
+			execResult.SuccessRows++
+		}
+	}
+
+	execResult.FailedRows = execResult.TotalRows - execResult.SuccessRows
+	proc.ExecResult = execResult
+
+	result, code, err = proc.after()
+	if code != 0 || result != nil || err != nil {
+		return
+	}
+
+	return
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func (proc *ProcOptions) prepareFields(execResult *ExecResult) (err error) {
+	if proc.ChainLocal.Params.Flags&path.FlagRequestDontMakeFlatModel != 0 {
+		return
+	}
+
+	var allMessages [][]string
+	proc.Fields, allMessages, err = proc.ChainLocal.Params.ExtractFieldsFromBody(proc.RawBody)
+	if err != nil {
+		return
+	}
+
+	for i := range proc.Fields {
+		r := &ExecResultRow{}
+		r.AddMessages(allMessages[i])
+		execResult.AddRow(r)
+	}
+
+	return
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func (proc *ProcOptions) checkFields(forUpdate bool, execResult *ExecResult) (success bool) {
+	success = true
+
+	if len(proc.Fields) == 0 {
+		r := &ExecResultRow{}
+		r.AddMessage("no data for save found")
+		execResult.AddRow(r)
+
+		success = false
+		return
+	}
+
+	if len(execResult.Rows) == 0 {
+		for range proc.Fields {
+			r := &ExecResultRow{}
+			execResult.AddRow(r)
+		}
+	}
+
+	if forUpdate && len(proc.Fields) > 1 {
+		execResult.Rows[0].AddMessage("%d records updated, expected 1", len(proc.Fields))
+		success = false
+		return
+	}
+
+	fieldsInfo := proc.ChainLocal.Params.DBFields.ByDbName()
+
+	fieldName := func(dbName string) (name string) {
+		name = dbName
+		fi, exists := fieldsInfo[dbName]
+		if exists {
+			name = fi.JsonName
+		}
+
+		return
+	}
+
+	for i, fields := range proc.Fields {
+		// check for required fields
+		for _, dbName := range proc.ChainLocal.Params.Request.RequiredFields {
+			if v, exists := fields[dbName]; !exists {
+				if forUpdate {
+					continue
+				}
+			} else {
+				vv := reflect.ValueOf(v)
+				if vv.Kind() != reflect.String || !vv.IsZero() {
+					continue
+				}
+			}
+
+			execResult.Rows[i].AddMessage(`mandatory field "%s" is not found`, fieldName(dbName))
+			success = false
 		}
 
 		if forUpdate {
-			// Update: check a key fields & empty required string fields
-
-			if len(proc.Fields) > 1 {
-				err = fmt.Errorf("%d records updated, expected 1", len(proc.Fields))
-				code = http.StatusBadRequest
-				return
-			}
-
-			proc.Fields = proc.Fields[0:1]
-			fields := proc.Fields[0]
-
-			for f := range requiredCounts {
-				v, exists := fields[f]
-				if !exists {
+			// check for key fields
+			for i, dbName := range proc.ChainLocal.Params.Request.UniqueKeyFields {
+				if _, exists := fields[dbName]; !exists {
 					continue
 				}
 
-				vv := reflect.ValueOf(v)
-				if vv.Kind() == reflect.String && vv.IsZero() {
-					lacks = append(lacks, f) // empty string for a required field
+				delete(fields, dbName)
+				tp := ""
+				if i == 0 {
+					tp = "primary "
 				}
-			}
-
-			if len(lacks) == 0 {
-				for i, f := range proc.ChainLocal.Params.Request.UniqueKeyFields {
-					if _, exists := fields[f]; exists {
-						delete(fields, f)
-						tp := ""
-						if i == 0 {
-							tp = "primary "
-						}
-						proc.Notices.Add(`%skey field "%s" ignored`, tp, f)
-					}
-				}
-			}
-		} else {
-			// Insert: check a required fields
-			if rqLn > 0 {
-				for _, fields := range proc.Fields {
-					for f, n := range requiredCounts {
-						v, exists := fields[f]
-						if !exists {
-							continue
-						}
-
-						vv := reflect.ValueOf(v)
-						if vv.Kind() == reflect.String && vv.IsZero() {
-							continue
-						}
-
-						requiredCounts[f] = n - 1
-					}
-				}
-
-				for f, n := range requiredCounts {
-					if n != 0 {
-						lacks = append(lacks, f)
-					}
-				}
+				execResult.Rows[i].AddMessage(`%skey field "%s" ignored`, tp, fieldName(dbName))
 			}
 		}
 
-		if len(lacks) != 0 {
-			names := proc.ChainLocal.Params.DBFields.ByDbName()
-
-			for i, name := range lacks {
-				fi, exists := names[name]
-				if !exists {
-					continue
-				}
-				lacks[i] = fi.JsonName
+		// check for excluded fields
+		for _, dbName := range proc.ExcludedFields {
+			if _, exists := fields[dbName]; !exists {
+				continue
 			}
 
-			err = fmt.Errorf("empty mandatory fields: %s", strings.Join(lacks, ", "))
-			code = http.StatusBadRequest
-			return
+			delete(fields, dbName)
+			execResult.Rows[i].AddMessage(`excluded field "%s" ignored`, fieldName(dbName))
+		}
+
+		// check for readonly fields
+		for _, dbName := range proc.ChainLocal.Params.Request.ReadonlyFields {
+			if _, exists := fields[dbName]; !exists {
+				continue
+			}
+
+			delete(fields, dbName)
+			execResult.Rows[i].AddMessage(`readonly field "%s" ignored`, fieldName(dbName))
 		}
 	}
 
-	excluded := make([]string, 0, 16)
+	totalFields := 0
+	for _, fields := range proc.Fields {
+		totalFields += len(fields)
+	}
 
-	if proc.ExcludedFields != nil {
+	if totalFields == 0 {
 		for i := range proc.Fields {
-			for jName, dbName := range proc.ExcludedFields {
-				if _, exists := proc.Fields[i][dbName]; exists {
-					excluded = append(excluded, jName)
-					delete(proc.Fields[i], dbName)
-				}
-			}
+			execResult.Rows[i].AddMessage("no data for save found")
 		}
+
+		success = false
 	}
 
-	if proc.ChainLocal.Params.Request.ReadonlyFields != nil {
-		for i := range proc.Fields {
-			for jName, dbName := range proc.ChainLocal.Params.Request.ReadonlyFields {
-				if _, exists := proc.Fields[i][dbName]; exists {
-					excluded = append(excluded, jName)
-					delete(proc.Fields[i], dbName)
-				}
-			}
-		}
-	}
+	return
+}
 
-	if len(excluded) != 0 {
-		proc.Notices.Add("readonly fields were ignored: %s", strings.Join(excluded, ", "))
-	}
+//----------------------------------------------------------------------------------------------------------------------------//
 
-	if len(proc.Fields) == 0 || len(proc.Fields[0]) == 0 {
-		proc.Notices.Add("no valid data to save")
-		code = http.StatusBadRequest
-		result = res
-		return
-	}
-
+func (proc *ProcOptions) makeQueryVars(forUpdate bool) (startIdx int, fieldNames []string) {
 	jbPairs, fieldNames, fieldVals := proc.ChainLocal.Params.DBFields.Prepare(proc.Fields)
-	if err != nil {
-		code = http.StatusBadRequest
-		return
-	}
 
 	// Собираем общие переменные
 
@@ -494,7 +585,7 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 		}
 	}
 
-	startIdx := len(commonVals) + 1
+	startIdx = len(commonVals) + 1
 
 	// Добавляем общие поля в начало
 
@@ -528,70 +619,6 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 	// Добавляем значения всех полей
 
 	proc.DBqueryVars = append(proc.DBqueryVars, fieldVals)
-
-	// Тип шаблона запроса
-
-	patternType := db.PatternTypeInsert
-	if forUpdate {
-		patternType = db.PatternTypeUpdate
-	}
-
-	var returnsObj *[]ExecResultRow
-
-	if !forUpdate && proc.ChainLocal.Params.Flags&path.FlagCreateReturnsObject != 0 {
-		// Get result from INSERT ... RETURNING id
-		returnsObj = &res.Rows
-	}
-
-	// Делаем запрос
-
-	var stdExecResult *db.Result
-	stdExecResult, err = db.ExecEx(proc.Info.DBtype, returnsObj, proc.DBqueryName, patternType, startIdx, fieldNames, proc.DBqueryVars)
-	if err != nil {
-		code = http.StatusInternalServerError
-		return
-	}
-
-	n, err := stdExecResult.RowsAffected()
-	if err != nil {
-		Log.Message(log.NOTICE, "[%d] RowsAffected: %s", proc.ID, err)
-	} else {
-		res.AffectedRows = uint64(n)
-	}
-
-	e := stdExecResult.Errors()
-	if len(e) > 0 && len(res.Rows) == 0 {
-		res.Rows = make([]ExecResultRow, len(e))
-	}
-
-	for i, e := range e {
-		if e == nil {
-			continue
-		}
-
-		proc.Notices.Add(e.Error())
-
-		if i < len(res.Rows) {
-			res.Rows[i].SetError(e)
-		}
-	}
-
-	proc.ExecResult = res
-
-	result, code, err = proc.after()
-	if err != nil {
-		if code == 0 {
-			code = http.StatusBadRequest
-		}
-		return
-	}
-	if code != 0 || result != nil {
-		return
-	}
-
-	res.Cleanup()
-	result = res
-
 	return
 }
 
@@ -599,18 +626,39 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 
 // Delete -- удалить
 func (proc *ProcOptions) Delete() (result any, code int, err error) {
-	result, code, err = proc.before()
-	if err != nil {
-		if code == 0 {
-			code = http.StatusBadRequest
-		}
-		return
+	execResult := &ExecResult{
+		TotalRows: 1,
 	}
-	if code != 0 || result != nil {
-		return
+	resultRow := &ExecResultRow{
+		Code: http.StatusOK,
 	}
+	execResult.AddRow(resultRow)
 
-	res := &ExecResult{}
+	defer func() {
+		if result != nil {
+			return
+		}
+
+		if err != nil {
+			if code == 0 {
+				code = http.StatusUnprocessableEntity
+			}
+			resultRow.Code = code
+			resultRow.AddError(err)
+			execResult.FailedRows = execResult.TotalRows
+		} else {
+			resultRow.Code = http.StatusOK
+			execResult.SuccessRows = execResult.TotalRows
+		}
+
+		result = execResult
+		code = http.StatusMultiStatus
+	}()
+
+	result, code, err = proc.before()
+	if code != 0 || result != nil || err != nil {
+		return
+	}
 
 	returnsObj := []struct {
 		Count uint64 `dbAlt:"count" db:"count"`
@@ -620,54 +668,39 @@ func (proc *ProcOptions) Delete() (result any, code int, err error) {
 		returnsObj = nil
 	}
 
+	var stdExecResult *db.Result
+
 	// Делаем запрос
 
-	var stdExecResult *db.Result
 	stdExecResult, err = db.ExecEx(proc.Info.DBtype, &returnsObj, proc.DBqueryName, db.PatternTypeNone, 0, nil, proc.DBqueryVars)
 	if err != nil {
-		e := err
-		ee := stdExecResult.Errors()
-		if len(ee) > 0 {
-			e = ee[0]
-		}
-		r := ExecResultRow{}
-		r.SetError(e)
-		res.AddRow(r)
-		proc.ExecResult = res
-		result = proc.ExecResult
 		code = http.StatusInternalServerError
+		resultRow.AddErrors(stdExecResult.Errors())
 		return
 	}
 
 	if returnsObj != nil {
 		if len(returnsObj) == 0 {
-			Log.Message(log.NOTICE, "[%d] empty query result received", proc.ID)
-		} else {
-			res.AffectedRows = returnsObj[0].Count
+			err = fmt.Errorf("empty query result received")
+			return
 		}
+		execResult.TotalRows = returnsObj[0].Count
 	} else {
-		n, err := stdExecResult.RowsAffected()
+		var n int64
+		n, err = stdExecResult.RowsAffected()
 		if err != nil {
-			Log.Message(log.NOTICE, "[%d] RowsAffected: %s", proc.ID, err)
-		} else {
-			res.AffectedRows = uint64(n)
+			err = fmt.Errorf("RowsAffected: %s", err)
+			return
 		}
+		execResult.TotalRows = uint64(n)
 	}
 
-	proc.ExecResult = res
+	proc.ExecResult = execResult
 
 	result, code, err = proc.after()
-	if err != nil {
-		if code == 0 {
-			code = http.StatusBadRequest
-		}
+	if code != 0 || result != nil || err != nil {
 		return
 	}
-	if code != 0 || result != nil {
-		return
-	}
-
-	result = proc.ExecResult
 
 	return
 }
@@ -791,6 +824,8 @@ func (proc *ProcOptions) before() (result any, code int, err error) {
 
 	return
 }
+
+//----------------------------------------------------------------------------------------------------------------------------//
 
 func (proc *ProcOptions) after() (result any, code int, err error) {
 	result, code, err = proc.handler.After(proc)

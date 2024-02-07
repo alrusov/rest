@@ -11,7 +11,7 @@ import (
 	"github.com/alrusov/config"
 	"github.com/alrusov/log"
 	"github.com/alrusov/misc"
-	"github.com/alrusov/rest/v3/path"
+	"github.com/alrusov/rest/v4/path"
 	"github.com/alrusov/stdhttp"
 )
 

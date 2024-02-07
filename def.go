@@ -15,7 +15,7 @@ import (
 	"github.com/alrusov/db"
 	"github.com/alrusov/log"
 	"github.com/alrusov/misc"
-	path "github.com/alrusov/rest/v3/path"
+	path "github.com/alrusov/rest/v4/path"
 	"github.com/alrusov/stdhttp"
 	"github.com/jmoiron/sqlx"
 )
@@ -92,9 +92,9 @@ type (
 		DBqueryRows      *sqlx.Rows          // Результат при ResultAsRows==true
 		Fields           []misc.InterfaceMap // Поля (имя из sql запроса) для insert или update. Для select - список полей для выборки из базы, если нужны не все из объекта
 		ExcludedFields   misc.StringMap      // Поля ([name]db_name), которые надо исключить из запроса
-		Notices          *misc.Messages      // Предупреждения и замечания обработчика
-		ExecResult       *ExecResult         // Результат выполнения Exec
-		ExtraHeaders     misc.StringMap      // Дополнительные возвращаемые HTTP заголовки
+		//Notices          *misc.Messages      // Предупреждения и замечания обработчика
+		ExecResult   *ExecResult    // Результат выполнения Exec
+		ExtraHeaders misc.StringMap // Дополнительные возвращаемые HTTP заголовки
 
 		Extra  any // Произвольные данные от вызывающего
 		Custom any // Произвольные пользовательские данные
@@ -116,16 +116,22 @@ type (
 	}
 
 	ExecResult struct {
-		AffectedRows uint64          `json:"affectedRows" comment:"Количеcтво затронутых записей"`
-		Rows         []ExecResultRow `json:"rows,omitempty" comment:"Созданные записи" ref:"execResultRow"`
-		Notice       string          `json:"notice,omitempty" comment:"Сообщения"`
+		TotalRows   uint64           `json:"totalRows" comment:"Количеcтво затронутых записей"`
+		SuccessRows uint64           `json:"successRows" comment:"Количеcтво затронутых записей (успешное завершение)"`
+		FailedRows  uint64           `json:"failedRows" comment:"Количеcтво затронутых записей (неуспешное завершение)"`
+		Rows        []*ExecResultRow `json:"rows,omitempty" comment:"Созданные записи" ref:"execResultRow"`
 	}
 
 	ExecResultRow struct {
-		ID      uint64 `json:"id,omitempty" comment:"ID созданной записи"`
-		GUID    string `json:"guid,omitempty" comment:"GUID созданной записи"`
-		Message string `json:"message,omitempty" comment:"Сообщения"`
-		err     error  `json:"-"`
+		Code int    `json:"code" comment:"Код завершения"`
+		ID   uint64 `json:"id,omitempty" comment:"ID созданной записи"`
+		GUID string `json:"guid,omitempty" comment:"GUID созданной записи"`
+		MessagesBlock
+	}
+
+	MessagesBlock struct {
+		Messages []string `json:"message,omitempty" comment:"Сообщения"`
+		errors   []error
 	}
 
 	Tags []*Tag
@@ -266,13 +272,9 @@ func AddTag(tag *Tag) error {
 	return nil
 }
 
-//----------------------------------------------------------------------------------------------------------------------------//
-
 func GetTags() Tags {
 	return tags
 }
-
-//----------------------------------------------------------------------------------------------------------------------------//
 
 func GetTagName(name string) string {
 	tag, exists := tagsMap[name]
@@ -299,8 +301,6 @@ func FindSubstArg(vars []any, name string) (subst *db.SubstArg) {
 	return
 }
 
-//----------------------------------------------------------------------------------------------------------------------------//
-
 func DelSubstArg(vars []any, name string) (result []any) {
 	for i, v := range vars {
 		switch vv := v.(type) {
@@ -317,59 +317,105 @@ func DelSubstArg(vars []any, name string) (result []any) {
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-func (r *ExecResult) Error() (err error) {
+func (r *ExecResult) AddRow(row *ExecResultRow) {
+	r.Rows = append(r.Rows, row)
+}
+
+func (r *ExecResult) FillMessages() {
 	if len(r.Rows) == 0 {
 		return
 	}
 
-	msgs := misc.NewMessages()
-
-	for i, row := range r.Rows {
-		if row.err == nil {
-			continue
-		}
-
-		msgs.Add(fmt.Sprintf("[%d] %s", i, row.err))
-	}
-
-	return msgs.Error()
-}
-
-//----------------------------------------------------------------------------------------------------------------------------//
-
-func (r *ExecResult) AddRow(row ExecResultRow) {
-	r.Rows = append(r.Rows, row)
-}
-
-//----------------------------------------------------------------------------------------------------------------------------//
-
-func (r *ExecResult) Cleanup() {
 	for _, r := range r.Rows {
-		if !r.IsEmpty() {
-			return
-		}
+		r.MessagesBlock.FillMessages()
+	}
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func (r *ExecResultRow) AddError(err error) {
+	r.MessagesBlock.AddError(err)
+}
+
+func (r *ExecResultRow) AddErrors(errs []error) {
+	r.MessagesBlock.AddErrors(errs)
+}
+
+func (r *ExecResultRow) AddMessage(s string, params ...any) {
+	r.MessagesBlock.AddMessage(s, params...)
+}
+
+func (r *ExecResultRow) AddMessages(ss []string) {
+	r.MessagesBlock.AddMessages(ss)
+}
+
+func (r *ExecResultRow) HasErrors() bool {
+	return r.MessagesBlock.HasErrors()
+}
+
+func (r *ExecResultRow) Errors() (err []error) {
+	return r.MessagesBlock.Errors()
+}
+
+func (r *ExecResultRow) FillMessages() {
+	r.MessagesBlock.FillMessages()
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func (m *MessagesBlock) AddError(err error) {
+	if err == nil {
+		return
 	}
 
-	r.Rows = nil
+	m.errors = append(m.errors, err)
 }
 
-//----------------------------------------------------------------------------------------------------------------------------//
+func (m *MessagesBlock) AddErrors(errs []error) {
+	if len(errs) == 0 {
+		return
+	}
 
-func (r *ExecResultRow) SetError(err error) {
-	r.err = err
-	r.Message = err.Error()
+	m.errors = append(m.errors, errs...)
 }
 
-//----------------------------------------------------------------------------------------------------------------------------//
+func (m *MessagesBlock) AddMessage(s string, params ...any) {
+	if s == "" {
+		return
+	}
 
-func (r *ExecResultRow) Error() (err error) {
-	return r.err
+	m.errors = append(m.errors, fmt.Errorf(s, params...))
 }
 
-//----------------------------------------------------------------------------------------------------------------------------//
+func (m *MessagesBlock) AddMessages(ss []string) {
+	if len(ss) == 0 {
+		return
+	}
 
-func (r *ExecResultRow) IsEmpty() bool {
-	return r.ID == 0 && r.GUID == "" && r.Message == "" && r.err == nil
+	for _, s := range ss {
+		m.AddMessage(s)
+	}
+}
+
+func (m *MessagesBlock) HasErrors() bool {
+	return len(m.errors) != 0
+}
+
+func (m *MessagesBlock) Errors() (errs []error) {
+	return m.errors
+}
+
+func (m *MessagesBlock) FillMessages() {
+	ln := len(m.errors)
+	if ln == 0 {
+		return
+	}
+
+	m.Messages = make([]string, 0, ln)
+
+	for _, e := range m.errors {
+		m.Messages = append(m.Messages, e.Error())
+	}
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//

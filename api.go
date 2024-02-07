@@ -16,7 +16,7 @@ import (
 	"github.com/alrusov/jsonw"
 	"github.com/alrusov/log"
 	"github.com/alrusov/misc"
-	path "github.com/alrusov/rest/v3/path"
+	path "github.com/alrusov/rest/v4/path"
 	"github.com/alrusov/stdhttp"
 )
 
@@ -41,18 +41,18 @@ func HandlerEx(find FindModule, extra any, h *stdhttp.HTTP, id uint64, prefix st
 	processed = true
 
 	proc := &ProcOptions{
-		handler:      module.Handler,
-		LogFacility:  module.LogFacility,
-		H:            h,
-		LogSrc:       fmt.Sprintf("%d", id),
-		Info:         module.Info,
-		ID:           id,
-		Prefix:       prefix,
-		Path:         urlPath,
-		Tail:         tail,
-		R:            r,
-		W:            w,
-		Notices:      misc.NewMessages(),
+		handler:     module.Handler,
+		LogFacility: module.LogFacility,
+		H:           h,
+		LogSrc:      fmt.Sprintf("%d", id),
+		Info:        module.Info,
+		ID:          id,
+		Prefix:      prefix,
+		Path:        urlPath,
+		Tail:        tail,
+		R:           r,
+		W:           w,
+		//Notices:      misc.NewMessages(),
 		Extra:        extra,
 		ExtraHeaders: make(misc.StringMap, 8),
 	}
@@ -127,18 +127,12 @@ func HandlerEx(find FindModule, extra any, h *stdhttp.HTTP, id uint64, prefix st
 	// Вызываем обработчик
 	result, code, err = proc.rest()
 
-	if err != nil {
-		proc.reply(result, code, err)
-		return
-	}
-
 	if code == StatusProcessed {
 		module.LogFacility.Message(log.TRACE3, "[%d] Answer already sent, do nothing", id)
 		return
 	}
 
 	proc.reply(result, code, err)
-
 	return
 }
 
@@ -192,6 +186,11 @@ func findModule(path string) (module *Module, basePath string, extraPath []strin
 func (proc *ProcOptions) reply(result any, code int, err error) {
 	if proc.Info.ResultTuner != nil {
 		result, code, err = proc.Info.ResultTuner(proc, result, code, err)
+	}
+
+	switch r := result.(type) {
+	case *ExecResult:
+		r.FillMessages()
 	}
 
 	readyAnswer := false
