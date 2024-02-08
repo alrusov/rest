@@ -92,9 +92,8 @@ type (
 		DBqueryRows      *sqlx.Rows          // Результат при ResultAsRows==true
 		Fields           []misc.InterfaceMap // Поля (имя из sql запроса) для insert или update. Для select - список полей для выборки из базы, если нужны не все из объекта
 		ExcludedFields   misc.StringMap      // Поля ([name]db_name), которые надо исключить из запроса
-		//Notices          *misc.Messages      // Предупреждения и замечания обработчика
-		ExecResult   *ExecResult    // Результат выполнения Exec
-		ExtraHeaders misc.StringMap // Дополнительные возвращаемые HTTP заголовки
+		ExecResult       *ExecResult         // Результат выполнения Exec
+		ExtraHeaders     misc.StringMap      // Дополнительные возвращаемые HTTP заголовки
 
 		Extra  any // Произвольные данные от вызывающего
 		Custom any // Произвольные пользовательские данные
@@ -116,6 +115,7 @@ type (
 	}
 
 	ExecResult struct {
+		Method      string           `json:"-" comment:"Метод"`
 		TotalRows   uint64           `json:"totalRows" comment:"Количеcтво затронутых записей"`
 		SuccessRows uint64           `json:"successRows" comment:"Количеcтво затронутых записей (успешное завершение)"`
 		FailedRows  uint64           `json:"failedRows" comment:"Количеcтво затронутых записей (неуспешное завершение)"`

@@ -182,7 +182,7 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 	result, code, err = proc.before()
 	if err != nil {
 		if code == 0 {
-			code = http.StatusBadRequest
+			code = http.StatusUnprocessableEntity
 		}
 		return
 	}
@@ -244,7 +244,7 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 
 	if len(fields) == 0 {
 		err = fmt.Errorf("empty fields list")
-		code = http.StatusBadRequest
+		code = http.StatusUnprocessableEntity
 		return
 	}
 
@@ -270,7 +270,7 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 		result, code, err = proc.after()
 		if err != nil {
 			if code == 0 {
-				code = http.StatusBadRequest
+				code = http.StatusUnprocessableEntity
 			}
 			return
 		}
@@ -712,7 +712,7 @@ func (proc *ProcOptions) Others() (result any, code int, err error) {
 	result, code, err = proc.before()
 	if err != nil {
 		if code == 0 {
-			code = http.StatusBadRequest
+			code = http.StatusUnprocessableEntity
 		}
 		return
 	}
@@ -723,7 +723,7 @@ func (proc *ProcOptions) Others() (result any, code int, err error) {
 	result, code, err = proc.after()
 	if err != nil {
 		if code == 0 {
-			code = http.StatusBadRequest
+			code = http.StatusUnprocessableEntity
 		}
 		return
 	}
@@ -789,7 +789,7 @@ func (info *Info) makeParamsDescription() (err error) {
 			d = []string{"-"}
 		}
 
-		chains.Description = fmt.Sprintf("%s. Параметры: %s", chains.Description, strings.Join(d, " & "))
+		chains.ParamsDescription = fmt.Sprintf("%s", strings.Join(d, " & "))
 	}
 
 	return
@@ -802,7 +802,7 @@ func (proc *ProcOptions) before() (result any, code int, err error) {
 		result, code, err = proc.Info.Before(proc)
 		if err != nil {
 			if code == 0 {
-				code = http.StatusBadRequest
+				code = http.StatusUnprocessableEntity
 			}
 			return
 		}
@@ -814,7 +814,7 @@ func (proc *ProcOptions) before() (result any, code int, err error) {
 	result, code, err = proc.handler.Before(proc)
 	if err != nil {
 		if code == 0 {
-			code = http.StatusBadRequest
+			code = http.StatusUnprocessableEntity
 		}
 		return
 	}
@@ -831,7 +831,7 @@ func (proc *ProcOptions) after() (result any, code int, err error) {
 	result, code, err = proc.handler.After(proc)
 	if err != nil {
 		if code == 0 {
-			code = http.StatusBadRequest
+			code = http.StatusUnprocessableEntity
 		}
 		return
 	}
@@ -843,7 +843,7 @@ func (proc *ProcOptions) after() (result any, code int, err error) {
 		result, code, err = proc.Info.After(proc)
 		if err != nil {
 			if code == 0 {
-				code = http.StatusBadRequest
+				code = http.StatusUnprocessableEntity
 			}
 			return
 		}

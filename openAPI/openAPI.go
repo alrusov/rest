@@ -483,7 +483,7 @@ func (proc *processor) scanChains(chains *path.Set, urlPath string, info *rest.I
 			pi := proc.result.Paths.Value(urlPath)
 			if pi == nil {
 				pathDescr := info.Summary
-				if len(pathParams) != 0 {
+				if len(pathExpr) != 0 {
 					pathDescr = fmt.Sprintf("%s. Разбор пути: %s", pathDescr, pathExpr)
 				}
 				pi = &oa.PathItem{
@@ -515,8 +515,8 @@ func (proc *processor) scanChains(chains *path.Set, urlPath string, info *rest.I
 			// Создаём операцию
 
 			op := &oa.Operation{
-				Summary:     chains.Summary,
-				Description: chains.Description,
+				Summary:     strings.Join([]string{info.Summary, chains.Summary, chain.Summary}, " "),
+				Description: strings.Join([]string{info.Description, chains.Description, chain.Description}, " "),
 				OperationID: oid,
 			}
 
@@ -557,13 +557,20 @@ func (proc *processor) scanChains(chains *path.Set, urlPath string, info *rest.I
 			}
 
 			// Стандартные ответы
+			switch method {
+			case stdhttp.MethodGET:
+				op.AddResponse(http.StatusNoContent, oa.NewResponse().WithDescription("No content"))
+				op.AddResponse(http.StatusUnprocessableEntity, oa.NewResponse().WithDescription("Unprocessable entity"))
+			case stdhttp.MethodPOST,
+				stdhttp.MethodPUT,
+				stdhttp.MethodPATCH,
+				stdhttp.MethodDELETE:
+				op.AddResponse(http.StatusMultiStatus, oa.NewResponse().WithDescription("Multi status"))
+			}
 
-			op.AddResponse(http.StatusNoContent, oa.NewResponse().WithDescription("No content"))
-			op.AddResponse(http.StatusBadRequest, oa.NewResponse().WithDescription("Bad request"))
 			op.AddResponse(http.StatusUnauthorized, oa.NewResponse().WithDescription("Unauthorized"))
 			op.AddResponse(http.StatusForbidden, oa.NewResponse().WithDescription("Forbidden"))
-			op.AddResponse(http.StatusNotFound, oa.NewResponse().WithDescription("Not found"))
-			op.AddResponse(http.StatusMethodNotAllowed, oa.NewResponse().WithDescription("Not allowed"))
+			op.AddResponse(http.StatusBadRequest, oa.NewResponse().WithDescription("Bad request"))
 			op.AddResponse(http.StatusInternalServerError, oa.NewResponse().WithDescription("Internal server error"))
 
 			// Request headers

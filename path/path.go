@@ -20,6 +20,7 @@ import (
 type (
 	Set struct {
 		Flags       Flags   `json:"flags,omitempty"`
+		Summary     string  `json:"summary"`
 		Description string  `json:"description"`
 		Methods     Methods `json:"methods"`
 	}
@@ -29,9 +30,10 @@ type (
 	Method = string
 
 	Chains struct {
-		Summary     string     `json:"summary"`
-		Description string     `json:"description"`
-		Chains      ChainsList `json:"chains"`
+		Summary           string     `json:"summary"`
+		Description       string     `json:"description"`
+		ParamsDescription string     `json:"description"`
+		Chains            ChainsList `json:"chains"`
 
 		StdParams Params `json:"params"`
 
@@ -43,6 +45,7 @@ type (
 	Chain struct {
 		Parent        *Chains         `json:"-"`
 		Flags         Flags           `json:"flags,omitempty"`
+		Summary       string          `json:"summary"`
 		Description   string          `json:"description"`
 		Name          string          `json:"name"`
 		Scope         string          `json:"scope,omitempty"`
