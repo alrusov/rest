@@ -25,17 +25,16 @@ type (
 		Methods     Methods `json:"methods"`
 	}
 
-	Methods map[Method]*Chains
-
-	Method = string
+	Methods map[string]*Chains
 
 	Chains struct {
 		Summary           string     `json:"summary"`
 		Description       string     `json:"description"`
 		ParamsDescription string     `json:"description"`
 		Chains            ChainsList `json:"chains"`
-
-		StdParams Params `json:"params"`
+		StdParams         Params     `json:"params"`
+		DefaultHttpCode   int        `json:"defaultHttpCode"`
+		HttpCodes         []int      `json:"httpCodes"`
 
 		prepared bool
 	}
@@ -51,7 +50,7 @@ type (
 		Scope         string          `json:"scope,omitempty"`
 		Params        Params          `json:"params"`
 		Tokens        []*Token        `json:"tokens"`
-		CacheLifetime config.Duration `json:"cacheLifeTime"` // Время жизни кэша, если 0, то не использовать
+		CacheLifetime config.Duration `json:"cacheLifetime"` // Время жизни кэша, если 0, то не использовать
 	}
 
 	Token struct {
@@ -185,7 +184,7 @@ func (set *Set) Prepare() (err error) {
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-func (set *Set) Find(m Method, path []string) (matched *Chain, pathParams any, result any, code int, err error) {
+func (set *Set) Find(m string, path []string) (matched *Chain, pathParams any, result any, code int, err error) {
 	c, exists := set.Methods[m]
 	if !exists || len(c.Chains) == 0 {
 		code = http.StatusMethodNotAllowed

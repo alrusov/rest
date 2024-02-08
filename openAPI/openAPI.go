@@ -17,6 +17,7 @@ import (
 	rest "github.com/alrusov/rest/v4"
 	path "github.com/alrusov/rest/v4/path"
 	"github.com/alrusov/stdhttp"
+
 	oa "github.com/getkin/kin-openapi/openapi3"
 )
 
@@ -59,6 +60,8 @@ type (
 	filler func(parent *oa.SchemaRef, field *reflect.StructField, tp string, format string) *oa.SchemaRef
 
 	TuneType func() reflect.Type
+
+	codesMap map[string][]int
 )
 
 const (
@@ -66,6 +69,35 @@ const (
 	refComponentsHeaders = "#/components/headers/"
 
 	TuneTypeFuncName = "TuneType"
+)
+
+var (
+	commonCodes = []int{
+		http.StatusUnauthorized,
+		http.StatusForbidden,
+		http.StatusBadRequest,
+		http.StatusInternalServerError,
+	}
+
+	codesByMethod = codesMap{
+		stdhttp.MethodGET: append(commonCodes,
+			http.StatusOK,
+			http.StatusNoContent,
+			http.StatusUnprocessableEntity,
+		),
+		stdhttp.MethodPOST: append(commonCodes,
+			http.StatusMultiStatus,
+		),
+		stdhttp.MethodPUT: append(commonCodes,
+			http.StatusMultiStatus,
+		),
+		stdhttp.MethodPATCH: append(commonCodes,
+			http.StatusMultiStatus,
+		),
+		stdhttp.MethodDELETE: append(commonCodes,
+			http.StatusMultiStatus,
+		),
+	}
 )
 
 //----------------------------------------------------------------------------------------------------------------------------//
@@ -402,9 +434,23 @@ func (proc *processor) addTags() (err error) {
 
 // Сканирует все цепочки с добавлением
 func (proc *processor) scanChains(chains *path.Set, urlPath string, info *rest.Info) (err error) {
-	// Парсим query параметры
+	jsonEnc := "application/json"
 
-	okStr := "OK"
+	// Стандартный объект ответа с ошибкой
+
+	errorResponseName := rest.ErrorResultName
+
+	obj, exists := proc.result.Components.Schemas[errorResponseName]
+	if !exists {
+		err = fmt.Errorf("unknown response object %s", errorResponseName)
+		return
+	}
+
+	errorResponseSchema := &oa.SchemaRef{
+		Ref:   refComponentsSchemas + errorResponseName,
+		Value: obj.Value,
+	}
+	proc.schemas[errorResponseName] = obj.Value
 
 	// Сканируем цепочки отдельно для каждого из методов
 	for method, chains := range chains.Methods {
@@ -431,7 +477,11 @@ func (proc *processor) scanChains(chains *path.Set, urlPath string, info *rest.I
 			}
 
 			if chain.Params.Request.Name != "" {
-				name := chain.Params.Request.Name + "CU" // CU == (create + update) without readonly fields
+				name := chain.Params.Request.Name
+				if chain.Params.Flags|path.FlagWithoutCU == 0 {
+					name += "CU" // CU == (create + update) without readonly fields
+				}
+
 				obj, exists := proc.result.Components.Schemas[name]
 				if !exists {
 					err = fmt.Errorf("%s: unknown request object %s", method, name)
@@ -523,7 +573,7 @@ func (proc *processor) scanChains(chains *path.Set, urlPath string, info *rest.I
 			if requestSchema != nil {
 				enc := chain.Params.Request.ContentType
 				if enc == "" {
-					enc = "application/json"
+					enc = jsonEnc
 				}
 
 				op.RequestBody = &oa.RequestBodyRef{
@@ -537,41 +587,79 @@ func (proc *processor) scanChains(chains *path.Set, urlPath string, info *rest.I
 				}
 			}
 
-			if responseSchema != nil {
+			// Стандаартный ответ
+
+			defaultCode := chains.DefaultHttpCode
+			if defaultCode == 0 {
+				defaultCode = http.StatusOK
+			}
+
+			if responseSchema == nil {
+				defaultCode = 0
+			} else {
 				enc := chain.Params.Response.ContentType
 				if enc == "" {
-					enc = "application/json"
+					enc = jsonEnc
 				}
 
-				op.AddResponse(http.StatusOK,
-					&oa.Response{
-						Description: &okStr,
-						Headers:     responseHeaders,
-						Content: oa.Content{
-							enc: &oa.MediaType{
-								Schema: responseSchema,
-							},
+				codeName := stdhttp.CodeName(defaultCode)
+
+				resp := &oa.Response{
+					Description: &codeName,
+					Headers:     responseHeaders,
+					Content: oa.Content{
+						enc: &oa.MediaType{
+							Schema: responseSchema,
 						},
 					},
-				)
+				}
+
+				op.AddResponse(defaultCode, resp.WithDescription(codeName))
 			}
 
-			// Стандартные ответы
-			switch method {
-			case stdhttp.MethodGET:
-				op.AddResponse(http.StatusNoContent, oa.NewResponse().WithDescription("No content"))
-				op.AddResponse(http.StatusUnprocessableEntity, oa.NewResponse().WithDescription("Unprocessable entity"))
-			case stdhttp.MethodPOST,
-				stdhttp.MethodPUT,
-				stdhttp.MethodPATCH,
-				stdhttp.MethodDELETE:
-				op.AddResponse(http.StatusMultiStatus, oa.NewResponse().WithDescription("Multi status"))
+			// Ответ по умолчанию
+			{
+				codeName := "default"
+
+				resp := &oa.Response{
+					Description: &codeName,
+					Content: oa.Content{
+						jsonEnc: &oa.MediaType{
+							Schema: errorResponseSchema,
+						},
+					},
+				}
+
+				op.AddResponse(0, resp.WithDescription(codeName))
 			}
 
-			op.AddResponse(http.StatusUnauthorized, oa.NewResponse().WithDescription("Unauthorized"))
-			op.AddResponse(http.StatusForbidden, oa.NewResponse().WithDescription("Forbidden"))
-			op.AddResponse(http.StatusBadRequest, oa.NewResponse().WithDescription("Bad request"))
-			op.AddResponse(http.StatusInternalServerError, oa.NewResponse().WithDescription("Internal server error"))
+			// Прочие ответы
+
+			codes := chains.HttpCodes
+			if len(codes) == 0 {
+				codes = CodesForMethod(method)
+			}
+
+			for _, code := range codes {
+				if code == defaultCode || code < 400 {
+					continue
+				}
+
+				// Ошибки
+
+				codeName := stdhttp.CodeName(code)
+
+				resp := &oa.Response{
+					Description: &codeName,
+					Content: oa.Content{
+						jsonEnc: &oa.MediaType{
+							Schema: errorResponseSchema,
+						},
+					},
+				}
+
+				op.AddResponse(code, resp.WithDescription(codeName))
+			}
 
 			// Request headers
 
@@ -1234,6 +1322,18 @@ func makeEnum(s string, dlm string) (enumItems []any) {
 		enumItems[i] = strings.TrimSpace(v)
 	}
 
+	return
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func CodesForMethod(method string) (codes []int) {
+	codes, exists := codesByMethod[method]
+	if exists {
+		return
+	}
+
+	codes = commonCodes
 	return
 }
 

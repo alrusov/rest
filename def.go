@@ -193,6 +193,7 @@ const (
 	REstatus = StatusActive + "|" + StatusInactive
 	REguid   = `(?i)([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})`
 
+	ErrorResultName   = "errorResult"
 	ExecResultName    = "execResult"
 	ExecResultRowName = "execResultRow"
 

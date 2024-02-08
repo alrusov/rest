@@ -24,6 +24,7 @@ func Init(cfg any, hh *stdhttp.HTTP, basePath string, defaultDB string, extraCon
 	defDB = defaultDB
 	configs = extraConfigs
 
+	path.SaveObject(ErrorResultName, reflect.TypeOf(stdhttp.ErrorResponse{}), false, false)
 	path.SaveObject(ExecResultName, reflect.TypeOf(ExecResult{}), false, false)
 	path.SaveObject(ExecResultRowName, reflect.TypeOf(ExecResultRow{}), false, false)
 
