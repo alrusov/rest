@@ -641,21 +641,21 @@ func (proc *processor) scanChains(chains *path.Set, urlPath string, info *rest.I
 			}
 
 			for _, code := range codes {
-				if code == defaultCode || code < 400 {
+				if code == defaultCode {
 					continue
 				}
 
-				// Ошибки
-
 				codeName := stdhttp.CodeName(code)
-
-				resp := &oa.Response{
-					Description: &codeName,
-					Content: oa.Content{
-						jsonEnc: &oa.MediaType{
-							Schema: errorResponseSchema,
-						},
-					},
+				resp := &oa.Response{}
+				if code >= 400 {
+					// Ошибки
+					resp = &oa.Response{
+						Description: &codeName,
+						Content: oa.Content{
+							jsonEnc: &oa.MediaType{
+								Schema: errorResponseSchema,
+							},
+						}}
 				}
 
 				op.AddResponse(code, resp.WithDescription(codeName))
