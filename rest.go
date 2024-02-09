@@ -317,7 +317,7 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 	execResult := &ExecResult{}
 
 	defer func() {
-		execResult.multiDefer(&result, &code, &err)
+		execResult.MultiDefer(&result, &code, &err)
 	}()
 
 	err = proc.prepareFields(execResult)
@@ -366,7 +366,7 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 
 	execResult.TotalRows = uint64(len(proc.Fields))
 
-	err = execResult.dbResultProcesor(stdExecResult, returnsObj)
+	err = execResult.DbResultParser(stdExecResult, returnsObj)
 	if err != nil {
 		code = http.StatusInternalServerError
 		return
@@ -580,7 +580,7 @@ func (proc *ProcOptions) Delete() (result any, code int, err error) {
 	execResult.AddRow(resultRow)
 
 	defer func() {
-		execResult.multiDefer(&result, &code, &err)
+		execResult.MultiDefer(&result, &code, &err)
 	}()
 
 	result, code, err = proc.before()
@@ -607,7 +607,7 @@ func (proc *ProcOptions) Delete() (result any, code int, err error) {
 		return
 	}
 
-	err = execResult.dbResultProcesor(stdExecResult, returnsObj)
+	err = execResult.DbResultParser(stdExecResult, returnsObj)
 	if err != nil {
 		code = http.StatusInternalServerError
 		return
@@ -775,7 +775,7 @@ func (proc *ProcOptions) after() (result any, code int, err error) {
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-func (execResult *ExecResult) multiDefer(pResult *any, pCode *int, pErr *error) {
+func (execResult *ExecResult) MultiDefer(pResult *any, pCode *int, pErr *error) {
 	if *pResult != nil || *pCode != 0 {
 		return
 	}
@@ -801,7 +801,7 @@ func (execResult *ExecResult) multiDefer(pResult *any, pCode *int, pErr *error) 
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-func (execResult *ExecResult) dbResultProcesor(stdExecResult *db.Result, returnsObj *[]*ExecResultRow) (err error) {
+func (execResult *ExecResult) DbResultParser(stdExecResult *db.Result, returnsObj *[]*ExecResultRow) (err error) {
 	if stdExecResult.HasError() {
 		for i, e := range stdExecResult.Errors() {
 			if i > len(execResult.Rows) {
