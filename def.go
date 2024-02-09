@@ -318,11 +318,19 @@ func DelSubstArg(vars []any, name string) (result []any) {
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
+func NewExecResult() *ExecResult {
+	return &ExecResult{}
+}
+
 func (r *ExecResult) AddRow(row *ExecResultRow) {
 	r.Rows = append(r.Rows, row)
 }
 
 func (r *ExecResult) FillMessages() {
+	if r == nil {
+		return
+	}
+
 	if len(r.Rows) == 0 {
 		return
 	}
@@ -333,6 +341,10 @@ func (r *ExecResult) FillMessages() {
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//
+
+func NewExecResultRow() *ExecResultRow {
+	return &ExecResultRow{}
+}
 
 func (r *ExecResultRow) AddError(err error) {
 	r.MessagesBlock.AddError(err)

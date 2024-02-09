@@ -314,7 +314,7 @@ func (proc *ProcOptions) Update() (result any, code int, err error) {
 }
 
 func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) {
-	execResult := &ExecResult{}
+	execResult := NewExecResult()
 
 	defer func() {
 		execResult.MultiDefer(&result, &code, &err)
@@ -351,7 +351,7 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 		// Get result from queries like a
 		// INSERT ... RETURNING id, guid
 		// UPDATE ... RETURNING id, guid
-		requestRes := &ExecResult{}
+		requestRes := NewExecResult()
 		returnsObj = &requestRes.Rows
 	}
 
@@ -396,7 +396,7 @@ func (proc *ProcOptions) prepareFields(execResult *ExecResult) (err error) {
 	}
 
 	for i := range proc.Fields {
-		r := &ExecResultRow{}
+		r := NewExecResultRow()
 		r.AddMessages(allMessages[i])
 		execResult.AddRow(r)
 	}
@@ -410,7 +410,7 @@ func (proc *ProcOptions) checkFields(forUpdate bool, execResult *ExecResult) (su
 	success = true
 
 	if len(proc.Fields) == 0 {
-		r := &ExecResultRow{}
+		r := NewExecResultRow()
 		r.AddMessage("no data for save found")
 		execResult.AddRow(r)
 
@@ -420,7 +420,7 @@ func (proc *ProcOptions) checkFields(forUpdate bool, execResult *ExecResult) (su
 
 	if len(execResult.Rows) == 0 {
 		for range proc.Fields {
-			r := &ExecResultRow{}
+			r := NewExecResultRow()
 			execResult.AddRow(r)
 		}
 	}
@@ -573,10 +573,9 @@ func (proc *ProcOptions) makeQueryVars(forUpdate bool) (startIdx int, fieldNames
 
 // Delete -- удалить
 func (proc *ProcOptions) Delete() (result any, code int, err error) {
-	execResult := &ExecResult{
-		TotalRows: 1,
-	}
-	resultRow := &ExecResultRow{}
+	execResult := NewExecResult()
+	execResult.TotalRows = 1
+	resultRow := NewExecResultRow()
 	execResult.AddRow(resultRow)
 
 	defer func() {
@@ -593,7 +592,7 @@ func (proc *ProcOptions) Delete() (result any, code int, err error) {
 	if proc.ChainLocal.Params.Flags&path.FlagUDqueriesReturnsID != 0 {
 		// Get result from queries like a
 		// DELETE ... RETURNING id, guid
-		requestRes := &ExecResult{}
+		requestRes := NewExecResult()
 		returnsObj = &requestRes.Rows
 	}
 
@@ -782,7 +781,7 @@ func (execResult *ExecResult) MultiDefer(pResult *any, pCode *int, pErr *error) 
 
 	if *pErr != nil {
 		if len(execResult.Rows) == 0 {
-			r := &ExecResultRow{}
+			r := NewExecResultRow()
 			execResult.AddRow(r)
 		}
 
@@ -805,7 +804,7 @@ func (execResult *ExecResult) DbResultParser(stdExecResult *db.Result, returnsOb
 	if stdExecResult.HasError() {
 		for i, e := range stdExecResult.Errors() {
 			if i > len(execResult.Rows) {
-				execResult.AddRow(&ExecResultRow{})
+				execResult.AddRow(NewExecResultRow())
 			}
 
 			if e == nil {
@@ -821,7 +820,7 @@ func (execResult *ExecResult) DbResultParser(stdExecResult *db.Result, returnsOb
 	if returnsObj != nil {
 		for i, src := range *returnsObj {
 			if i == len(execResult.Rows) {
-				execResult.AddRow(&ExecResultRow{})
+				execResult.AddRow(NewExecResultRow())
 			}
 
 			r := execResult.Rows[i]
