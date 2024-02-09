@@ -117,7 +117,7 @@ const (
 	FlagResponseHashed           = Flags(0x00000001)
 	FlagRequestDontMakeFlatModel = Flags(0x00000002)
 	FlagResponseIsNotArray       = Flags(0x00000004)
-	FlagCreateReturnsObject      = Flags(0x00000008)
+	FlagUDqueriesReturnsID       = Flags(0x00000008)
 	FlagWithoutCU                = Flags(0x00000010)
 
 	FlagChainDefault    = Flags(0x00000001)

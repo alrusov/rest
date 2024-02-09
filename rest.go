@@ -317,35 +317,12 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 	execResult := &ExecResult{}
 
 	defer func() {
-		if result != nil {
-			return
-		}
-
-		if err != nil {
-			if code == 0 {
-				code = http.StatusUnprocessableEntity
-			}
-
-			if len(execResult.Rows) == 0 {
-				r := &ExecResultRow{}
-				execResult.AddRow(r)
-			}
-
-			for _, r := range execResult.Rows {
-				r.Code = code
-				r.AddError(err)
-			}
-
-			execResult.TotalRows = uint64(len(execResult.Rows))
-			execResult.FailedRows = execResult.TotalRows
-		}
-
-		result = execResult
-		code = http.StatusMultiStatus
+		execResult.multiDefer(&result, &code, &err)
 	}()
 
 	err = proc.prepareFields(execResult)
 	if err != nil {
+		code = http.StatusBadRequest
 		return
 	}
 
@@ -369,10 +346,12 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 	}
 
 	var returnsObj *[]*ExecResultRow
-	requestRes := &ExecResult{}
 
-	if !forUpdate && proc.ChainLocal.Params.Flags&path.FlagCreateReturnsObject != 0 {
-		// Get result from INSERT ... RETURNING id
+	if proc.ChainLocal.Params.Flags&path.FlagUDqueriesReturnsID != 0 {
+		// Get result from queries like a
+		// INSERT ... RETURNING id, guid
+		// UPDATE ... RETURNING id, guid
+		requestRes := &ExecResult{}
 		returnsObj = &requestRes.Rows
 	}
 
@@ -387,44 +366,12 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 
 	execResult.TotalRows = uint64(len(proc.Fields))
 
-	if stdExecResult.HasError() {
-		for i, e := range stdExecResult.Errors() {
-			if i > len(execResult.Rows) {
-				break
-			}
-
-			if e == nil {
-				continue
-			}
-
-			r := execResult.Rows[i]
-			r.Code = http.StatusInternalServerError
-			r.AddError(e)
-
-		}
+	err = execResult.dbResultProcesor(stdExecResult, returnsObj)
+	if err != nil {
+		code = http.StatusInternalServerError
+		return
 	}
 
-	if returnsObj != nil {
-		for i, src := range *returnsObj {
-			if i == len(execResult.Rows) {
-				break
-			}
-
-			r := execResult.Rows[i]
-
-			if src == nil {
-				r.Code = http.StatusInternalServerError
-				continue
-			}
-
-			r.ID = src.ID
-			r.GUID = src.GUID
-			r.Code = http.StatusOK
-			execResult.SuccessRows++
-		}
-	}
-
-	execResult.FailedRows = execResult.TotalRows - execResult.SuccessRows
 	proc.ExecResult = execResult
 
 	result, code, err = proc.after()
@@ -629,30 +576,11 @@ func (proc *ProcOptions) Delete() (result any, code int, err error) {
 	execResult := &ExecResult{
 		TotalRows: 1,
 	}
-	resultRow := &ExecResultRow{
-		Code: http.StatusOK,
-	}
+	resultRow := &ExecResultRow{}
 	execResult.AddRow(resultRow)
 
 	defer func() {
-		if result != nil {
-			return
-		}
-
-		if err != nil {
-			if code == 0 {
-				code = http.StatusUnprocessableEntity
-			}
-			resultRow.Code = code
-			resultRow.AddError(err)
-			execResult.FailedRows = execResult.TotalRows
-		} else {
-			resultRow.Code = http.StatusOK
-			execResult.SuccessRows = execResult.TotalRows
-		}
-
-		result = execResult
-		code = http.StatusMultiStatus
+		execResult.multiDefer(&result, &code, &err)
 	}()
 
 	result, code, err = proc.before()
@@ -660,39 +588,29 @@ func (proc *ProcOptions) Delete() (result any, code int, err error) {
 		return
 	}
 
-	returnsObj := []struct {
-		Count uint64 `dbAlt:"count" db:"count"`
-	}{}
+	var returnsObj *[]*ExecResultRow
 
-	if proc.ChainLocal.Params.Flags&path.FlagCreateReturnsObject == 0 {
-		returnsObj = nil
+	if proc.ChainLocal.Params.Flags&path.FlagUDqueriesReturnsID != 0 {
+		// Get result from queries like a
+		// DELETE ... RETURNING id, guid
+		requestRes := &ExecResult{}
+		returnsObj = &requestRes.Rows
 	}
 
 	var stdExecResult *db.Result
 
 	// Делаем запрос
 
-	stdExecResult, err = db.ExecEx(proc.Info.DBtype, &returnsObj, proc.DBqueryName, db.PatternTypeNone, 0, nil, proc.DBqueryVars)
+	stdExecResult, err = db.ExecEx(proc.Info.DBtype, returnsObj, proc.DBqueryName, db.PatternTypeNone, 0, nil, proc.DBqueryVars)
 	if err != nil {
 		code = http.StatusInternalServerError
-		resultRow.AddErrors(stdExecResult.Errors())
 		return
 	}
 
-	if returnsObj != nil {
-		if len(returnsObj) == 0 {
-			err = fmt.Errorf("empty query result received")
-			return
-		}
-		execResult.TotalRows = returnsObj[0].Count
-	} else {
-		var n int64
-		n, err = stdExecResult.RowsAffected()
-		if err != nil {
-			err = fmt.Errorf("RowsAffected: %s", err)
-			return
-		}
-		execResult.TotalRows = uint64(n)
+	err = execResult.dbResultProcesor(stdExecResult, returnsObj)
+	if err != nil {
+		code = http.StatusInternalServerError
+		return
 	}
 
 	proc.ExecResult = execResult
@@ -789,7 +707,7 @@ func (info *Info) makeParamsDescription() (err error) {
 			d = []string{"-"}
 		}
 
-		chains.ParamsDescription = fmt.Sprintf("%s", strings.Join(d, " & "))
+		chains.ParamsDescription = strings.Join(d, " & ")
 	}
 
 	return
@@ -852,6 +770,101 @@ func (proc *ProcOptions) after() (result any, code int, err error) {
 		}
 	}
 
+	return
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func (execResult *ExecResult) multiDefer(pResult *any, pCode *int, pErr *error) {
+	if *pResult != nil || *pCode != 0 {
+		return
+	}
+
+	if *pErr != nil {
+		if len(execResult.Rows) == 0 {
+			r := &ExecResultRow{}
+			execResult.AddRow(r)
+		}
+
+		for _, r := range execResult.Rows {
+			r.Code = http.StatusUnprocessableEntity
+			r.AddError(*pErr)
+		}
+
+		execResult.TotalRows = uint64(len(execResult.Rows))
+		execResult.FailedRows = execResult.TotalRows
+	}
+
+	*pResult = execResult
+	*pCode = http.StatusMultiStatus
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func (execResult *ExecResult) dbResultProcesor(stdExecResult *db.Result, returnsObj *[]*ExecResultRow) (err error) {
+	if stdExecResult.HasError() {
+		for i, e := range stdExecResult.Errors() {
+			if i > len(execResult.Rows) {
+				execResult.AddRow(&ExecResultRow{})
+			}
+
+			if e == nil {
+				continue
+			}
+
+			r := execResult.Rows[i]
+			r.Code = http.StatusInternalServerError
+			r.AddError(e)
+		}
+	}
+
+	if returnsObj != nil {
+		for i, src := range *returnsObj {
+			if i == len(execResult.Rows) {
+				execResult.AddRow(&ExecResultRow{})
+			}
+
+			r := execResult.Rows[i]
+
+			if src == nil {
+				r.Code = http.StatusNotFound
+				continue
+			}
+
+			if src.ID == 0 {
+				r.Code = http.StatusNotFound
+			} else {
+				r.ID = src.ID
+				r.GUID = src.GUID
+				r.Code = http.StatusOK
+				execResult.SuccessRows++
+			}
+		}
+	} else {
+		var n int64
+		n, err = stdExecResult.RowsAffected()
+		if err != nil {
+			err = fmt.Errorf("RowsAffected: %s", err)
+			return
+		}
+
+		execResult.SuccessRows = uint64(n)
+		c := http.StatusOK
+		if n == 0 {
+			c = http.StatusNotFound
+		}
+		for _, r := range execResult.Rows {
+			r.Code = c
+		}
+	}
+
+	for _, r := range execResult.Rows {
+		if r.Code == 0 {
+			r.Code = http.StatusNotFound
+		}
+	}
+
+	execResult.FailedRows = execResult.TotalRows - execResult.SuccessRows
 	return
 }
 
