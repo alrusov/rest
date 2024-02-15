@@ -41,18 +41,17 @@ func HandlerEx(find FindModule, extra any, h *stdhttp.HTTP, id uint64, prefix st
 	processed = true
 
 	proc := &ProcOptions{
-		handler:     module.Handler,
-		LogFacility: module.LogFacility,
-		H:           h,
-		LogSrc:      fmt.Sprintf("%d", id),
-		Info:        module.Info,
-		ID:          id,
-		Prefix:      prefix,
-		Path:        urlPath,
-		Tail:        tail,
-		R:           r,
-		W:           w,
-		//Notices:      misc.NewMessages(),
+		handler:      module.Handler,
+		LogFacility:  module.LogFacility,
+		H:            h,
+		LogSrc:       fmt.Sprintf("%d", id),
+		Info:         module.Info,
+		ID:           id,
+		Prefix:       prefix,
+		Path:         urlPath,
+		Tail:         tail,
+		R:            r,
+		W:            w,
 		Extra:        extra,
 		ExtraHeaders: make(misc.StringMap, 8),
 	}
@@ -60,6 +59,12 @@ func HandlerEx(find FindModule, extra any, h *stdhttp.HTTP, id uint64, prefix st
 	var err error
 	var result any
 	var code int
+
+	proc.AuthIdentity, err = stdhttp.GetIdentityFromRequestContext(r)
+	if err != nil {
+		proc.reply(result, code, err)
+		return
+	}
 
 	if r.Method == "" {
 		r.Method = stdhttp.MethodPOST // Это ответ kAPI"

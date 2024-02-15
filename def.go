@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alrusov/auth"
 	"github.com/alrusov/config"
 	"github.com/alrusov/db"
 	"github.com/alrusov/log"
@@ -77,6 +78,7 @@ type (
 		Tail             []string            // Остаток пути
 		R                *http.Request       // Запрос
 		W                http.ResponseWriter // Интерфейс для ответа
+		AuthIdentity     *auth.Identity      // Результаты аутентификации
 		Chain            *path.Chain         // Обрабатываемая цепочка
 		ChainLocal       path.Chain          // Копия Chain для возможности ее модификации для работы с динамическими объектами. Рекомендуется использовать её, а не Chain.Parent
 		Scope            string              // Обрабатываемый Scope
