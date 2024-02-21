@@ -348,6 +348,14 @@ func NewExecResultRow() *ExecResultRow {
 	return &ExecResultRow{}
 }
 
+func (r *ExecResultRow) GetCode() (code int) {
+	return r.Code
+}
+
+func (r *ExecResultRow) SetCode(code int) {
+	r.Code = code
+}
+
 func (r *ExecResultRow) AddError(err error) {
 	r.MessagesBlock.AddError(err)
 }

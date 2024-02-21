@@ -800,10 +800,10 @@ func (execResult *ExecResult) MultiDefer(pResult *any, pCode *int, pErr *error) 
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-func (execResult *ExecResult) DbResultParser(stdExecResult *db.Result, returnsObj *[]*ExecResultRow) (err error) {
-	if stdExecResult.HasError() {
-		for i, e := range stdExecResult.Errors() {
-			if i > len(execResult.Rows) {
+func (execResult *ExecResult) DbResultParser(dbExecResult *db.Result, returnsObj *[]*ExecResultRow) (err error) {
+	if dbExecResult.HasError() {
+		for i, e := range dbExecResult.Errors() {
+			if i == len(execResult.Rows) {
 				execResult.AddRow(NewExecResultRow())
 			}
 
@@ -826,12 +826,16 @@ func (execResult *ExecResult) DbResultParser(stdExecResult *db.Result, returnsOb
 			r := execResult.Rows[i]
 
 			if src == nil {
-				r.Code = http.StatusNotFound
+				if r.Code == 0 {
+					r.Code = http.StatusNotFound
+				}
 				continue
 			}
 
 			if src.ID == 0 {
-				r.Code = http.StatusNotFound
+				if r.Code == 0 {
+					r.Code = http.StatusNotFound
+				}
 			} else {
 				r.ID = src.ID
 				r.GUID = src.GUID
@@ -841,7 +845,7 @@ func (execResult *ExecResult) DbResultParser(stdExecResult *db.Result, returnsOb
 		}
 	} else {
 		var n int64
-		n, err = stdExecResult.RowsAffected()
+		n, err = dbExecResult.RowsAffected()
 		if err != nil {
 			err = fmt.Errorf("RowsAffected: %s", err)
 			return
