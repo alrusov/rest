@@ -30,7 +30,7 @@ type (
 	Chains struct {
 		Summary           string     `json:"summary"`
 		Description       string     `json:"description"`
-		ParamsDescription string     `json:"description"`
+		ParamsDescription string     `json:"paramsDescription"`
 		Chains            ChainsList `json:"chains"`
 		StdParams         Params     `json:"params"`
 		DefaultHttpCode   int        `json:"defaultHttpCode"`
