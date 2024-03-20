@@ -565,8 +565,8 @@ func (proc *processor) scanChains(chains *path.Set, urlPath string, info *rest.I
 			// Создаём операцию
 
 			op := &oa.Operation{
-				Summary:     strings.Join([]string{info.Summary, chains.Summary, chain.Summary}, " "),
-				Description: strings.Join([]string{info.Description, chains.Description, chain.Description}, " "),
+				Summary:     strings.TrimSpace(strings.Join([]string{info.Summary, chains.Summary, chain.Summary}, " ")),
+				Description: strings.TrimSpace(strings.Join([]string{info.Description, chains.Description, chain.Description}, " ")),
 				OperationID: oid,
 			}
 
