@@ -31,6 +31,10 @@ func InternalServerError(msg string, v ...any) (code int, err error) {
 	return codeAndError(http.StatusInternalServerError, "internal server error", msg, v...)
 }
 
+func Forbidden(msg string, v ...any) (code int, err error) {
+	return codeAndError(http.StatusForbidden, "forbidden", msg, v...)
+}
+
 func codeAndError(code int, defaultMsg string, msg string, v ...any) (outCode int, err error) {
 	if msg == "" {
 		msg = defaultMsg
