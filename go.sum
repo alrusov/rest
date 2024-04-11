@@ -1,11 +1,11 @@
 github.com/DATA-DOG/go-sqlmock v1.5.2 h1:OcvFkGmslmlZibjAjaHm3L//6LiuBgolP7OputlJIzU=
 github.com/DATA-DOG/go-sqlmock v1.5.2/go.mod h1:88MAG/4G7SMwSE3CeA0ZKzrT5CiOU3OJ+JlNzwDqpNU=
-github.com/alrusov/auth v0.1.7 h1:QgvMUHSkVmmtTNEw0tNtD25gAdbygeRT+QH6MhLPSzw=
-github.com/alrusov/auth v0.1.7/go.mod h1:BNtERqu3GgGvatRoW5GCCfnh/M4h3YC823tiGlYgwCY=
+github.com/alrusov/auth v0.1.9 h1:B23jZJ/c5Jb0ZYfBRJzCFSq8bZAqVEwFFxZOmbjIlmE=
+github.com/alrusov/auth v0.1.9/go.mod h1:zUVUIKBWzSAn9IkYnyhLeaEfU/XGeQVoCXgGIAx+EnE=
 github.com/alrusov/cache v0.1.3 h1:85V1rQMPPWGoDQJXSP6kMouvKMco2mpLPcGLSqFcQ2o=
 github.com/alrusov/cache v0.1.3/go.mod h1:HhtVpg98GDldkDpUJe1E8AVmSNFZyfjmgkECJz0eYRQ=
-github.com/alrusov/config v0.1.58 h1:N91xPXXNlmVyhIE4FkjWBBEA/jK9wDcyxiYNSc5WHn0=
-github.com/alrusov/config v0.1.58/go.mod h1:Q2L96+mL8ySE41cbqvNH6Ai/VfQ+NGgdzTNgjxpDdQo=
+github.com/alrusov/config v0.1.59 h1:C7dIWCUikZhbe0odTiOgw5wzOKcaL99stPBZjaADRk8=
+github.com/alrusov/config v0.1.59/go.mod h1:FfOv2hK9kwo8tjA5QnvUM3Vcnfn6m1xnH903qp/3HBA=
 github.com/alrusov/db v0.1.49 h1:nSVIJsashQ+X/w3aP8ZNzgPgypvcz+ZF6XpZaIm1ITs=
 github.com/alrusov/db v0.1.49/go.mod h1:MwTlkuH82QX+nS9Rg7T2BDrqBjs0Eafewy+aDxBt/t8=
 github.com/alrusov/initializer v0.1.2 h1:AgMeT/SW7wvqo2x0cZCHaqBOpELQMjCI6yYQFMRKPv4=
@@ -25,8 +25,8 @@ github.com/alrusov/stdhttp v0.1.119/go.mod h1:M9m8Mn45v0326Q775AtRuhb+iBCwm3RwOx
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/getkin/kin-openapi v0.123.0 h1:zIik0mRwFNLyvtXK274Q6ut+dPh6nlxBp0x7mNrPhs8=
-github.com/getkin/kin-openapi v0.123.0/go.mod h1:wb1aSZA/iWmorQP9KTAS/phLj/t17B5jT7+fS8ed9NM=
+github.com/getkin/kin-openapi v0.124.0 h1:VSFNMB9C9rTKBnQ/fpyDU8ytMTr4dWI9QovSKj9kz/M=
+github.com/getkin/kin-openapi v0.124.0/go.mod h1:wb1aSZA/iWmorQP9KTAS/phLj/t17B5jT7+fS8ed9NM=
 github.com/go-openapi/jsonpointer v0.20.2 h1:mQc3nmndL8ZBzStEo3JYF8wzmeWffDH4VbXz58sAx6Q=
 github.com/go-openapi/jsonpointer v0.20.2/go.mod h1:bHen+N0u1KEO3YlmqOjTT9Adn1RfD91Ar825/PuiRVs=
 github.com/go-openapi/swag v0.22.8 h1:/9RjDSQ0vbFR+NyjGMkFTsA1IA0fmhKSThmfGZjicbw=

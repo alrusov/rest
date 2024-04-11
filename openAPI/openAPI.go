@@ -65,13 +65,16 @@ type (
 )
 
 const (
-	refComponentsSchemas = "#/components/schemas/"
-	refComponentsHeaders = "#/components/headers/"
+	refComponentsSchemas         = "#/components/schemas/"
+	refComponentsSecuritySchemes = "#/components/securitySchemes/"
+	refComponentsHeaders         = "#/components/headers/"
 
 	TuneTypeFuncName = "TuneType"
 )
 
 var (
+	extraSecuritySchemes = oa.SecuritySchemes{}
+
 	commonCodes = []int{
 		http.StatusUnauthorized,
 		http.StatusForbidden,
@@ -115,6 +118,12 @@ func (x *Config) Check(cfg any) (err error) {
 	}
 
 	return msgs.Error()
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func AddSecurityScheme(name string, sr *oa.SecuritySchemeRef) {
+	extraSecuritySchemes[name] = sr
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//
@@ -222,7 +231,7 @@ func (proc *processor) prepare() (err error) {
 
 	if m, exists := proc.httpCfg.Auth.Methods["jwt"]; exists {
 		if m.Enabled {
-			name := "jwtAuth"
+			name := "jwt"
 			securitySchemes[name] = &oa.SecuritySchemeRef{
 				Value: oa.NewJWTSecurityScheme(),
 			}
@@ -231,14 +240,24 @@ func (proc *processor) prepare() (err error) {
 
 	if m, exists := proc.httpCfg.Auth.Methods["basic"]; exists {
 		if m.Enabled {
-			name := "basicAuth"
+			name := "basic"
 			securitySchemes[name] = &oa.SecuritySchemeRef{
 				Value: &oa.SecurityScheme{
 					Type:   "http",
-					Scheme: "basic",
+					Scheme: name,
 				},
 			}
 		}
+	}
+
+	for name, sr := range extraSecuritySchemes {
+		securitySchemes[name] = sr
+	}
+
+	security := oa.NewSecurityRequirements()
+
+	for name := range securitySchemes {
+		security.With(oa.NewSecurityRequirement().Authenticate(name))
 	}
 
 	proc.result = &oa.T{
@@ -263,7 +282,7 @@ func (proc *processor) prepare() (err error) {
 			Version: oaCfg.Version,
 		},
 		Paths:    oa.NewPaths(),
-		Security: *oa.NewSecurityRequirements(),
+		Security: *security,
 		Servers:  servers,
 		//ExternalDocs: &oa.ExternalDocs{},
 	}
@@ -354,7 +373,7 @@ func (proc *processor) addComponentSchemas() (err error) {
 			if t.ArrayType != nil {
 				schemas[name+"Array"] = &oa.SchemaRef{
 					Value: &oa.Schema{
-						Type: "array",
+						Type: &oa.Types{"array"},
 						Items: &oa.SchemaRef{
 							Ref:   refComponentsSchemas + name,
 							Value: objSchema,
@@ -391,7 +410,7 @@ func (proc *processor) addComponentHeader(name string, descr string) (err error)
 				Description: descr,
 				Schema: &oa.SchemaRef{
 					Value: &oa.Schema{
-						Type: "string",
+						Type: &oa.Types{"string"},
 					},
 				},
 			},
@@ -671,7 +690,7 @@ func (proc *processor) scanChains(chains *path.Set, urlPath string, info *rest.I
 					Required:    false,
 					Schema: &oa.SchemaRef{
 						Value: &oa.Schema{
-							Type: "string",
+							Type: &oa.Types{"string"},
 						},
 					},
 				}
@@ -786,15 +805,15 @@ func (proc *processor) makePathParameters(urlPath string, chain *path.Chain) (fu
 			Required:    true,
 			Schema: &oa.SchemaRef{
 				Value: &oa.Schema{
-					Type:   oaTp,
+					Type:   &oa.Types{oaTp},
 					Format: oaFmt,
 					Enum:   enumItems,
 				},
 			},
 		}
-		if sample != "" {
-			//p.Schema.Value.Example = sample
-		}
+		//if sample != "" {
+		//p.Schema.Value.Example = sample
+		//}
 
 		pathParams = append(pathParams, p)
 	}
@@ -866,15 +885,15 @@ func (proc *processor) makeParameters(t reflect.Type, in string) (pp []*oa.Param
 				Required:    required,
 				Schema: &oa.SchemaRef{
 					Value: &oa.Schema{
-						Type:   tp,
+						Type:   &oa.Types{tp},
 						Format: format,
 						Enum:   enumItems,
 					},
 				},
 			}
-			if sample != "" {
-				//p.Schema.Value.Example = sample
-			}
+			//if sample != "" {
+			//p.Schema.Value.Example = sample
+			//}
 
 			defVal, defExists := field.Tag.Lookup(path.TagDefault)
 			if defExists {
@@ -898,7 +917,7 @@ func (proc *processor) makeObjectSchema(topName string, t reflect.Type, withoutR
 	schemaRef := &oa.SchemaRef{
 		Value: &oa.Schema{
 			Description: "",
-			Type:        "object",
+			Type:        &oa.Types{"object"},
 			Format:      "",
 			Properties:  make(oa.Schemas),
 		},
@@ -922,7 +941,7 @@ func (proc *processor) makeObjectSchema(topName string, t reflect.Type, withoutR
 					s = &oa.SchemaRef{
 						Value: &oa.Schema{
 							Description: "",
-							Type:        tp,
+							Type:        &oa.Types{tp},
 							Format:      format,
 							Properties:  make(oa.Schemas),
 						},
@@ -970,7 +989,7 @@ func (proc *processor) makeObjectSchema(topName string, t reflect.Type, withoutR
 				s = &oa.SchemaRef{
 					Value: &oa.Schema{
 						Description: descr,
-						Type:        tp,
+						Type:        &oa.Types{tp},
 						Format:      "",
 						Properties:  make(oa.Schemas, 32),
 					},
@@ -989,15 +1008,15 @@ func (proc *processor) makeObjectSchema(topName string, t reflect.Type, withoutR
 				s = &oa.SchemaRef{
 					Value: &oa.Schema{
 						Description: descr,
-						Type:        tp,
+						Type:        &oa.Types{tp},
 						Format:      format,
 						Properties:  make(oa.Schemas),
 						Enum:        enumItems,
 					},
 				}
-				if sample != "" {
-					//s.Value.Example = sample
-				}
+				//if sample != "" {
+				//s.Value.Example = sample
+				//}
 
 				if defExists {
 					s.Value.Default, err = conv(tp, defVal)
@@ -1206,8 +1225,8 @@ func (proc *processor) scanObject(parentList *misc.BoolMap, parent *oa.SchemaRef
 						}
 					}
 				}
-				if me.Value.Type == "map" {
-					me.Value.Type = "object"
+				if (*me.Value.Type)[0] == "map" {
+					me.Value.Type = &oa.Types{"object"}
 					me.Value.AdditionalProperties.Schema = me.Value.Items
 					me.Value.Items = nil
 				}
