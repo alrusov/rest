@@ -67,9 +67,8 @@ func (proc *ProcOptions) rest() (result any, code int, err error) {
 		ProcOptions: proc,
 	}
 
-	proc.Info.shaperQueue <- s
-
 	s.cond.L.Lock()
+	proc.Info.shaperQueue <- s
 	s.cond.Wait()
 	s.cond.L.Unlock()
 
