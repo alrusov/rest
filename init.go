@@ -103,6 +103,8 @@ func ModuleRegistration(handler API) (err error) {
 
 	if info.DBtype == "" {
 		info.DBtype = defDB
+	} else if info.DBtype == DBtypeNone {
+		info.DBtype = ""
 	}
 
 	if info.QueryPrefix != "" && !strings.HasSuffix(info.QueryPrefix, ".") {

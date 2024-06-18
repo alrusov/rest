@@ -13,6 +13,7 @@ import (
 	"github.com/alrusov/misc"
 	path "github.com/alrusov/rest/v4/path"
 	"github.com/alrusov/stdhttp"
+	"github.com/jmoiron/sqlx"
 )
 
 /*
@@ -122,6 +123,24 @@ func (info *Info) ShaperWorkers(n int) (err error) {
 
 // Обработка
 func (proc *ProcOptions) do() (result any, code int, err error) {
+	// start/finish transaction
+
+	err = proc.beginTransaction()
+	if err != nil {
+		return
+	}
+
+	defer func() {
+		success := err == nil && (code/100 <= 2)
+		e := proc.finishTransaction(success)
+		if err == nil && e != nil {
+			err = e
+			return
+		}
+	}()
+
+	// processing
+
 	switch proc.R.Method {
 	default:
 		return proc.Others()
@@ -252,14 +271,21 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 	)
 
 	for {
+		var res any
 		if proc.ResultAsRows {
-			err = db.Query(proc.Info.DBtype, &proc.DBqueryRows, proc.DBqueryName, fields, proc.DBqueryVars)
+			res = &proc.DBqueryRows
 		} else {
 			srcTp := proc.responseSouceType()
 			proc.DBqueryResult = reflect.New(reflect.SliceOf(srcTp)).Interface()
-
-			err = db.Query(proc.Info.DBtype, proc.DBqueryResult, proc.DBqueryName, fields, proc.DBqueryVars)
+			res = proc.DBqueryResult
 		}
+
+		err = proc.setDB()
+		if err != nil {
+			return
+		}
+
+		err = proc.db.QueryTx(proc.dbTx, res, proc.DBqueryName, fields, proc.DBqueryVars)
 
 		if err != nil {
 			code = http.StatusInternalServerError
@@ -356,8 +382,14 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 
 	// Делаем запрос
 
+	err = proc.setDB()
+	if err != nil {
+		return
+	}
+
 	var stdExecResult *db.Result
-	stdExecResult, err = db.ExecEx(proc.Info.DBtype, returnsObj, proc.DBqueryName, patternType, startIdx, fieldNames, proc.DBqueryVars)
+	stdExecResult, err = proc.db.ExecTxEx(proc.dbTx, returnsObj, proc.DBqueryName, patternType, startIdx, fieldNames, proc.DBqueryVars)
+
 	if err != nil {
 		code = http.StatusInternalServerError
 		return
@@ -599,7 +631,13 @@ func (proc *ProcOptions) Delete() (result any, code int, err error) {
 
 	// Делаем запрос
 
-	stdExecResult, err = db.ExecEx(proc.Info.DBtype, returnsObj, proc.DBqueryName, db.PatternTypeNone, 0, nil, proc.DBqueryVars)
+	err = proc.setDB()
+	if err != nil {
+		return
+	}
+
+	stdExecResult, err = proc.db.ExecTxEx(proc.dbTx, returnsObj, proc.DBqueryName, db.PatternTypeNone, 0, nil, proc.DBqueryVars)
+
 	if err != nil {
 		code = http.StatusInternalServerError
 		return
@@ -795,6 +833,71 @@ func (execResult *ExecResult) MultiDefer(pResult *any, pCode *int, pErr *error) 
 
 	*pResult = execResult
 	*pCode = http.StatusMultiStatus
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func (proc *ProcOptions) setDB() (err error) {
+	if proc.db != nil {
+		return
+	}
+
+	proc.db, err = db.GetDB(proc.Info.DBtype)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (proc *ProcOptions) GetDB() (db *db.DB, tx *sqlx.Tx) {
+	db = proc.db
+	tx = proc.dbTx
+	return
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func (proc *ProcOptions) beginTransaction() (err error) {
+	if !proc.Info.WithTransactions || proc.Info.DBtype == "" {
+		return
+	}
+
+	err = proc.setDB()
+	if err != nil {
+		return
+	}
+
+	conn, err := proc.db.GetConn()
+	if err != nil {
+		return
+	}
+
+	proc.dbTx, err = conn.Beginx()
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (proc *ProcOptions) finishTransaction(success bool) (err error) {
+	if !proc.Info.WithTransactions || proc.Info.DBtype == "" {
+		return
+	}
+
+	if proc.dbTx == nil {
+		err = fmt.Errorf("transaction is not started")
+		return
+	}
+
+	if success {
+		err = proc.dbTx.Commit()
+	} else {
+		err = proc.dbTx.Rollback()
+	}
+
+	return
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//

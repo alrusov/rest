@@ -47,22 +47,23 @@ type (
 
 	// Информация о методе
 	Info struct {
-		Path           string          // Относительный (от базового) путь в URL
-		Name           string          // Имя, желательно  чтобы по правилам имен переменных
-		Summary        string          // Краткое описание
-		Description    string          // Описание, по умолчанию сформированное из Summary и query параметров
-		Tags           []string        // Имена тегов для группировки
-		Flags          path.Flags      // Флаги
-		Methods        *path.Set       // Цепочки обработки
-		Config         any             // Кастомные параметры в конфиг файле
-		DBtype         string          // Тип базы. Если пусто, то по умолчанию из конфига
-		QueryPrefix    string          // Префикс имени запроса в базу
-		Init           FuncInit        // User defined Init
-		Before         FuncBefore      // User defined Before query
-		After          FuncAfter       // User defined After query
-		shaperQueueLen int             // Shaper queue length, 0 - direct mode (without shaper)
-		shaperQueue    chan *shaper    // Shaper queue
-		ResultTuner    FuncResultTuner // The last step result tuner
+		Path             string          // Относительный (от базового) путь в URL
+		Name             string          // Имя, желательно  чтобы по правилам имен переменных
+		Summary          string          // Краткое описание
+		Description      string          // Описание, по умолчанию сформированное из Summary и query параметров
+		Tags             []string        // Имена тегов для группировки
+		Flags            path.Flags      // Флаги
+		Methods          *path.Set       // Цепочки обработки
+		Config           any             // Кастомные параметры в конфиг файле
+		DBtype           string          // Тип базы. Если пусто, то по умолчанию из конфига
+		WithTransactions bool            // Разрешить транзакции
+		QueryPrefix      string          // Префикс имени запроса в базу
+		Init             FuncInit        // User defined Init
+		Before           FuncBefore      // User defined Before query
+		After            FuncAfter       // User defined After query
+		shaperQueueLen   int             // Shaper queue length, 0 - direct mode (without shaper)
+		shaperQueue      chan *shaper    // Shaper queue
+		ResultTuner      FuncResultTuner // The last step result tuner
 	}
 
 	// Опции запроса к методу
@@ -87,6 +88,8 @@ type (
 		QueryParams      any                 // Query параметры
 		QueryParamsFound misc.BoolMap        // Query параметры, присутствующие в запросе в явном виде
 		RequestParams    any                 // Request параметры
+		db               *db.DB              // database connection
+		dbTx             *sqlx.Tx            // database transaction
 		DBqueryName      string              // Имя запроса к базе данных
 		DBqueryVars      []any               // Переменные для формирования запроса
 		ResultAsRows     bool                // Возвращать для GET не готовый результат, а *sqlx.Rows, чтобы производить разбор самостоятельно. Актуально для больших результатов.
@@ -206,6 +209,8 @@ const (
 
 	StatusProcessed = 999 // Специальный http status, говорящий о том, что все ответы уже отправлены
 	StatusRetry     = 998 // Специальный http status, возвращаемый из After для повторного выполнения GET запроса (с возможно измененными там параметрами)
+
+	DBtypeNone = "-"
 )
 
 //----------------------------------------------------------------------------------------------------------------------------//
