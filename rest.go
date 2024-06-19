@@ -859,12 +859,16 @@ func (proc *ProcOptions) GetDB() (db *db.DB, tx *sqlx.Tx) {
 //----------------------------------------------------------------------------------------------------------------------------//
 
 func (proc *ProcOptions) beginTransaction() (err error) {
-	if !proc.Info.WithTransactions || proc.Info.DBtype == "" {
+	if proc.Info.DBtype == "" {
 		return
 	}
 
 	err = proc.setDB()
 	if err != nil {
+		return
+	}
+
+	if !proc.Info.WithTransactions {
 		return
 	}
 
