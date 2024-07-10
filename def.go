@@ -11,14 +11,16 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jmoiron/sqlx"
+
 	"github.com/alrusov/auth"
 	"github.com/alrusov/config"
 	"github.com/alrusov/db"
 	"github.com/alrusov/log"
 	"github.com/alrusov/misc"
 	path "github.com/alrusov/rest/v4/path"
+	"github.com/alrusov/shaping"
 	"github.com/alrusov/stdhttp"
-	"github.com/jmoiron/sqlx"
 )
 
 //----------------------------------------------------------------------------------------------------------------------------//
@@ -61,8 +63,7 @@ type (
 		Init             FuncInit        // User defined Init
 		Before           FuncBefore      // User defined Before query
 		After            FuncAfter       // User defined After query
-		shaperQueueLen   int             // Shaper queue length, 0 - direct mode (without shaper)
-		shaperQueue      chan *shaper    // Shaper queue
+		shaping          *shaping.S      // Shaper
 		ResultTuner      FuncResultTuner // The last step result tuner
 	}
 
@@ -446,6 +447,16 @@ func (m *MessagesBlock) FillMessages() {
 	for _, e := range m.errors {
 		m.Messages = append(m.Messages, e.Error())
 	}
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func (info *Info) InitShaping(ln int) {
+	if ln <= 0 {
+		return
+	}
+
+	info.shaping = shaping.New(ln)
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//

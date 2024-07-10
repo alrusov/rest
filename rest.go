@@ -6,14 +6,14 @@ import (
 	"reflect"
 	"slices"
 	"strings"
-	"sync"
+
+	"github.com/jmoiron/sqlx"
 
 	"github.com/alrusov/cache"
 	"github.com/alrusov/db"
 	"github.com/alrusov/misc"
 	path "github.com/alrusov/rest/v4/path"
 	"github.com/alrusov/stdhttp"
-	"github.com/jmoiron/sqlx"
 )
 
 /*
@@ -32,91 +32,13 @@ Recommended behavior
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-type (
-	shaper struct {
-		cond *sync.Cond
-		*ProcOptions
-		result any
-		code   int
-		err    error
-	}
-)
-
-var (
-	maxShaperLen = 32 // proc.Info.shaperQueueLen > maxShaperLen is without limitation
-)
-
-//----------------------------------------------------------------------------------------------------------------------------//
-
-func SetMaxShaperLen(n int) {
-	if n < 0 {
-		n = 0
-	}
-
-	maxShaperLen = n
-}
-
-//----------------------------------------------------------------------------------------------------------------------------//
-
 func (proc *ProcOptions) rest() (result any, code int, err error) {
-	if proc.Info.shaperQueueLen == 0 {
-		return proc.do()
+	if proc.Info.shaping != nil {
+		proc.Info.shaping.In()
+		defer proc.Info.shaping.Out()
 	}
 
-	s := &shaper{
-		cond:        sync.NewCond(&sync.Mutex{}),
-		ProcOptions: proc,
-	}
-
-	s.cond.L.Lock()
-	proc.Info.shaperQueue <- s
-	s.cond.Wait()
-	s.cond.L.Unlock()
-
-	result = s.result
-	code = s.code
-	err = s.err
-	return
-}
-
-//----------------------------------------------------------------------------------------------------------------------------//
-
-func (info *Info) ShaperWorkers(n int) (err error) {
-	if info.shaperQueueLen != 0 {
-		err = fmt.Errorf("shaper already initialized")
-		return
-	}
-
-	if n < 0 || n > maxShaperLen {
-		n = 0
-	}
-
-	if n == 0 {
-		return
-	}
-
-	info.shaperQueueLen = n
-	info.shaperQueue = make(chan *shaper, n)
-
-	for i := 0; i < n; i++ {
-		go func() {
-			for {
-				s, ok := <-info.shaperQueue
-				if !ok {
-					// chan closed
-					return
-				}
-
-				s.result, s.code, s.err = s.do()
-
-				s.cond.L.Lock()
-				s.cond.Signal()
-				s.cond.L.Unlock()
-			}
-		}()
-	}
-
-	return
+	return proc.do()
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//

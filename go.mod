@@ -1,6 +1,6 @@
 module github.com/alrusov/rest/v4
 
-go 1.22.4
+go 1.22.5
 
 require (
 	github.com/alrusov/auth v0.1.9
@@ -10,8 +10,9 @@ require (
 	github.com/alrusov/jsonw v0.1.3
 	github.com/alrusov/log v0.1.38
 	github.com/alrusov/misc v1.1.13
+	github.com/alrusov/shaping v0.1.0
 	github.com/alrusov/stdhttp v0.1.119
-	github.com/getkin/kin-openapi v0.125.0
+	github.com/getkin/kin-openapi v0.126.0
 	github.com/jmoiron/sqlx v1.4.0
 )
 
@@ -20,9 +21,9 @@ require (
 	github.com/alrusov/initializer v0.1.2 // indirect
 	github.com/alrusov/loadavg v0.1.5 // indirect
 	github.com/alrusov/panic v0.1.15 // indirect
-	github.com/go-openapi/jsonpointer v0.20.2 // indirect
-	github.com/go-openapi/swag v0.22.8 // indirect
-	github.com/invopop/yaml v0.2.0 // indirect
+	github.com/go-openapi/jsonpointer v0.21.0 // indirect
+	github.com/go-openapi/swag v0.23.0 // indirect
+	github.com/invopop/yaml v0.3.1 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
