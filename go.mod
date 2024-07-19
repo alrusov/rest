@@ -9,7 +9,7 @@ require (
 	github.com/alrusov/db v0.1.50
 	github.com/alrusov/jsonw v0.1.3
 	github.com/alrusov/log v0.1.38
-	github.com/alrusov/misc v1.1.13
+	github.com/alrusov/misc v1.1.14
 	github.com/alrusov/shaping v0.1.0
 	github.com/alrusov/stdhttp v0.1.119
 	github.com/getkin/kin-openapi v0.126.0

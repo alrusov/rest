@@ -90,11 +90,11 @@ type (
 
 	RequestParams struct {
 		ParamsObject    `json:"object"`
-		FlatModel       misc.StringMap `json:"-"`                      // ключ - путь до поля, значение - db name
-		RevFlatModel    misc.StringMap `json:"-"`                      // ключ - db name, значение - путь до поля
-		RequiredFields  misc.StringMap `json:"-"`                      // обязательные поля, ключ - путь до поля, значение - db name
-		ReadonlyFields  misc.StringMap `json:"-"`                      // поля только на чтение, ключ - путь до поля, значение - db name
-		UniqueKeyFields []string       `json:"requestUniqueKeyFields"` // уникальные поля, первый - primary key (формально)
+		FlatModel       misc.StringMap    `json:"-"`                      // ключ - путь до поля, значение - db name
+		BlankTemplate   misc.InterfaceMap `json:"-"`                      // Все поля, которые могут быть изменены, заполненные пустыми значениями, ключ - db name
+		RequiredFields  misc.StringMap    `json:"-"`                      // обязательные поля, ключ - путь до поля, значение - db name
+		ReadonlyFields  misc.StringMap    `json:"-"`                      // поля только на чтение, ключ - путь до поля, значение - db name
+		UniqueKeyFields []string          `json:"requestUniqueKeyFields"` // уникальные поля, первый - primary key (формально)
 	}
 
 	ResponseParams struct {
@@ -687,8 +687,9 @@ var (
 
 func (p *Params) MakeTypeFlatModel() (err error) {
 	p.Request.FlatModel = make(misc.StringMap, 64)
+	p.Request.BlankTemplate = make(misc.InterfaceMap, 64)
 
-	err = p.typeFlatModelIterator(db.Tag(), "", &p.Request.FlatModel, p.Request.Type)
+	err = p.typeFlatModelIterator(db.Tag(), "", &p.Request.FlatModel, &p.Request.BlankTemplate, p.Request.Type)
 	if err != nil {
 		return
 	}
@@ -696,8 +697,7 @@ func (p *Params) MakeTypeFlatModel() (err error) {
 	return
 }
 
-func (p *Params) typeFlatModelIterator(tagDB string, base string, model *misc.StringMap, t reflect.Type) (err error) {
-
+func (p *Params) typeFlatModelIterator(tagDB string, base string, model *misc.StringMap, blank *misc.InterfaceMap, t reflect.Type) (err error) {
 	if t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
@@ -708,11 +708,6 @@ func (p *Params) typeFlatModelIterator(tagDB string, base string, model *misc.St
 		f := t.Field(i)
 
 		if !f.IsExported() {
-			continue
-		}
-
-		readonly := f.Tag.Get(TagReadonly)
-		if readonly == "true" {
 			continue
 		}
 
@@ -754,7 +749,7 @@ func (p *Params) typeFlatModelIterator(tagDB string, base string, model *misc.St
 
 		case reflect.Struct:
 			if _, exists := specialTypes[f.Type.String()]; !exists {
-				err = p.typeFlatModelIterator(tagDB, fName, model, f.Type)
+				err = p.typeFlatModelIterator(tagDB, fName, model, blank, f.Type)
 				if err != nil {
 					return
 				}
@@ -764,8 +759,6 @@ func (p *Params) typeFlatModelIterator(tagDB string, base string, model *misc.St
 			fallthrough
 
 		default:
-			(*model)[fName] = dbName
-
 			if f.Tag.Get(TagRole) == RolePrimary && base == "" { // Предполагается только на первом уровне
 				if p.Request.UniqueKeyFields[0] != "" {
 					err = fmt.Errorf(`duplicated primary key: "%s" and "%s"`, p.Request.UniqueKeyFields[0], fName)
@@ -778,14 +771,17 @@ func (p *Params) typeFlatModelIterator(tagDB string, base string, model *misc.St
 				p.Request.UniqueKeyFields = append(p.Request.UniqueKeyFields, fName)
 			}
 
-			if misc.StructTagName(&f, TagRequired) == "true" {
+			if f.Tag.Get(TagRequired) == "true" {
 				p.Request.RequiredFields[fName] = dbName
 			}
 
-			if misc.StructTagName(&f, TagReadonly) == "true" {
+			if f.Tag.Get(TagReadonly) == "true" {
 				p.Request.ReadonlyFields[fName] = dbName
+				continue
 			}
 
+			(*model)[fName] = dbName
+			(*blank)[dbName] = reflect.New(ft).Elem().Interface()
 		}
 	}
 

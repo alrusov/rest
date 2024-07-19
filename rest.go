@@ -71,13 +71,13 @@ func (proc *ProcOptions) do() (result any, code int, err error) {
 		return proc.Get()
 
 	case stdhttp.MethodPOST:
-		return proc.Create()
+		return proc.Post()
 
 	case stdhttp.MethodPUT:
-		return proc.Update()
+		return proc.Put()
 
 	case stdhttp.MethodPATCH:
-		return proc.Update()
+		return proc.Patch()
 
 	case stdhttp.MethodDELETE:
 		return proc.Delete()
@@ -250,24 +250,32 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-// Create -- создать
-func (proc *ProcOptions) Create() (result any, code int, err error) {
-	return proc.save(false)
+// POST
+func (proc *ProcOptions) Post() (result any, code int, err error) {
+	return proc.save(false, false)
 }
 
-// Update -- изменить
-func (proc *ProcOptions) Update() (result any, code int, err error) {
-	return proc.save(true)
+// PUT
+func (proc *ProcOptions) Put() (result any, code int, err error) {
+	return proc.save(true, true)
 }
 
-func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) {
+// PATCH
+func (proc *ProcOptions) Patch() (result any, code int, err error) {
+	return proc.save(true, false)
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+// common save
+func (proc *ProcOptions) save(forUpdate bool, addBlank bool) (result any, code int, err error) {
 	execResult := NewExecResult()
 
 	defer func() {
 		execResult.MultiDefer(&result, &code, &err)
 	}()
 
-	err = proc.prepareFields(execResult)
+	err = proc.prepareFields(execResult, addBlank)
 	if err != nil {
 		code = http.StatusBadRequest
 		return
@@ -337,7 +345,7 @@ func (proc *ProcOptions) save(forUpdate bool) (result any, code int, err error) 
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-func (proc *ProcOptions) prepareFields(execResult *ExecResult) (err error) {
+func (proc *ProcOptions) prepareFields(execResult *ExecResult, addBlank bool) (err error) {
 	if proc.ChainLocal.Params.Flags&path.FlagRequestDontMakeFlatModel != 0 {
 		return
 	}
@@ -346,6 +354,19 @@ func (proc *ProcOptions) prepareFields(execResult *ExecResult) (err error) {
 	proc.Fields, allMessages, err = proc.ChainLocal.Params.ExtractFieldsFromBody(proc.RawBody)
 	if err != nil {
 		return
+	}
+
+	if addBlank {
+		blank := proc.ChainLocal.Params.Request.BlankTemplate
+		if blank != nil {
+			for _, fields := range proc.Fields {
+				for name, val := range blank {
+					if _, exists := fields[name]; !exists {
+						fields[name] = val
+					}
+				}
+			}
+		}
 	}
 
 	for i := range proc.Fields {
