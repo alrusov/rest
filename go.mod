@@ -6,7 +6,7 @@ require (
 	github.com/alrusov/auth v0.1.9
 	github.com/alrusov/cache v0.1.3
 	github.com/alrusov/config v0.1.59
-	github.com/alrusov/db v0.1.50
+	github.com/alrusov/db v0.1.51
 	github.com/alrusov/jsonw v0.1.3
 	github.com/alrusov/log v0.1.38
 	github.com/alrusov/misc v1.1.14

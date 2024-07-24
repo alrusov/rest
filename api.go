@@ -409,7 +409,7 @@ func scanQueryParams(proc *ProcOptions, t reflect.Type, v reflect.Value, nameMap
 
 		// Значение по умолчанию
 		defVal := fieldT.Tag.Get(path.TagDefault)
-		if defVal != "" {
+		if defVal != "" && defVal != path.DefaultValueNull {
 			if err := convert(defVal, v.Field(i)); err != nil {
 				proc.LogFacility.Message(log.DEBUG, "[%d] parseQueryParams: %s", proc.ID, err)
 			}

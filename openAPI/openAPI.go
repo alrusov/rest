@@ -1309,6 +1309,10 @@ func (proc *processor) entityType(t reflect.Type) (kind reflect.Kind, tp string,
 //----------------------------------------------------------------------------------------------------------------------------//
 
 func conv(tp string, v string) (any, error) {
+	if v == path.DefaultValueNull {
+		return nil, nil
+	}
+
 	switch tp {
 	default:
 		return v, fmt.Errorf(`conv: illegal type "%s"`, tp)

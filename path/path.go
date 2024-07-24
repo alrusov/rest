@@ -132,23 +132,25 @@ const (
 
 	// Имена тегов полей в описании query параметров
 	TagJSON     = "json"
-	TagDB       = db.TagDB
-	TagDBAlt    = db.TagDBAlt
-	TagSample   = "sample"
-	TagComment  = "comment"
-	TagRequired = "required"
-	TagReadonly = "readonly"
-	TagRole     = "role"
-	TagRef      = "ref"
-	TagDefault  = "default"
-	TagEnum     = "enum"
-	TagOA       = "oa"
-	TagOAtype   = "oaType"
-	TagOAformat = "oaFormat"
+	TagDB       = db.TagDB      // Database field definition
+	TagDBAlt    = db.TagDBAlt   // Database field definition (alternative)
+	TagDefault  = db.TagDefault // default value
+	TagSample   = "sample"      // Sample field value
+	TagComment  = "comment"     // Field comment
+	TagRequired = "required"    // Is field required
+	TagReadonly = "readonly"    // Is field readonly
+	TagRole     = "role"        // Field role (see Role* below)
+	TagRef      = "ref"         // OpenAPI ref
+	TagEnum     = "enum"        // OpenAPI enum content
+	TagOA       = "oa"          // OpenAPI name
+	TagOAtype   = "oaType"      // OpenAPI type
+	TagOAformat = "oaFormat"    // OpenAPI format
 
 	RolePrimary     = "primary"
 	RoleKey         = "key"
 	StdPrimaryField = VarID
+
+	DefaultValueNull = db.DefaultValueNull
 )
 
 var (
@@ -781,7 +783,13 @@ func (p *Params) typeFlatModelIterator(tagDB string, base string, model *misc.St
 			}
 
 			(*model)[fName] = dbName
-			(*blank)[dbName] = reflect.New(ft).Elem().Interface()
+
+			defVal := f.Tag.Get(TagDefault)
+			if defVal == DefaultValueNull {
+				(*blank)[dbName] = nil
+			} else {
+				(*blank)[dbName] = reflect.New(ft).Elem().Interface()
+			}
 		}
 	}
 
