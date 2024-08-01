@@ -553,7 +553,7 @@ func (proc *processor) scanChains(chains *path.Set, urlPath string, info *rest.I
 			if pi == nil {
 				pathDescr := info.Summary
 				if len(pathExpr) != 0 {
-					pathDescr = fmt.Sprintf("%s. Разбор пути: %s", pathDescr, pathExpr)
+					pathDescr = fmt.Sprintf("%s. Path: %s", pathDescr, pathExpr)
 				}
 				pi = &oa.PathItem{
 					Summary:     info.Summary,

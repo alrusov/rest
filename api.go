@@ -509,12 +509,12 @@ func CheckPeriod(from time.Time, to time.Time, maxPeriod time.Duration, stdPerio
 		from = to.Add(-stdPeriod)
 	} else {
 		if !from.Before(to) {
-			code, err = BadRequest(`%s(%s) должно быть меньше %s(%s)`, ParamPeriodFrom, from, ParamPeriodTo, to)
+			code, err = BadRequest(`%s(%s) must be less than %s(%s)`, ParamPeriodFrom, from, ParamPeriodTo, to)
 			return
 		}
 
 		if from.Add(maxPeriod).Before(to) {
-			code, err = BadRequest(`период между %s(%s) и  %s(%s) не должен превышать %d секунд`, ParamPeriodFrom, from, ParamPeriodTo, to, maxPeriod/time.Second)
+			code, err = BadRequest(`the period between %s(%s) and %s(%s) must not exceed %d seconds`, ParamPeriodFrom, from, ParamPeriodTo, to, maxPeriod/time.Second)
 			return
 		}
 	}

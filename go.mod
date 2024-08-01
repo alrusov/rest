@@ -12,7 +12,7 @@ require (
 	github.com/alrusov/misc v1.1.14
 	github.com/alrusov/shaping v0.1.0
 	github.com/alrusov/stdhttp v0.1.119
-	github.com/getkin/kin-openapi v0.126.0
+	github.com/getkin/kin-openapi v0.127.0
 	github.com/jmoiron/sqlx v1.4.0
 )
 

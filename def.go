@@ -121,22 +121,22 @@ type (
 	}
 
 	ExecResult struct {
-		Method      string           `json:"-" comment:"Метод"`
-		TotalRows   uint64           `json:"totalRows" comment:"Количеcтво затронутых записей"`
-		SuccessRows uint64           `json:"successRows" comment:"Количеcтво затронутых записей (успешное завершение)"`
-		FailedRows  uint64           `json:"failedRows" comment:"Количеcтво затронутых записей (неуспешное завершение)"`
-		Rows        []*ExecResultRow `json:"rows,omitempty" comment:"Созданные записи" ref:"execResultRow"`
+		Method      string           `json:"-" comment:"Method"`
+		TotalRows   uint64           `json:"totalRows" comment:"Number of records affected"`
+		SuccessRows uint64           `json:"successRows" comment:"Number of records affected (success)"`
+		FailedRows  uint64           `json:"failedRows" comment:"Number of records affected (failed)"`
+		Rows        []*ExecResultRow `json:"rows,omitempty" comment:"Created records" ref:"execResultRow"`
 	}
 
 	ExecResultRow struct {
-		Code int    `json:"code" comment:"Код завершения"`
-		ID   uint64 `json:"id,omitempty" comment:"ID созданной записи"`
-		GUID string `json:"guid,omitempty" comment:"GUID созданной записи"`
+		Code int    `json:"code" comment:"Result code"`
+		ID   uint64 `json:"id,omitempty" comment:"ID of the created record"`
+		GUID string `json:"guid,omitempty" comment:"GUID of the created record"`
 		MessagesBlock
 	}
 
 	MessagesBlock struct {
-		Messages []string `json:"message,omitempty" comment:"Сообщения"`
+		Messages []string `json:"message,omitempty" comment:"Messages"`
 		errors   []error
 	}
 
