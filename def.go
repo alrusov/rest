@@ -225,7 +225,7 @@ var (
 	defDB   string
 	configs misc.InterfaceMap
 
-	modulesMutex = new(sync.RWMutex)
+	modulesMutex sync.RWMutex
 	modules      = map[string]*Module{} // Обработчики API
 
 	tags    = Tags{}
