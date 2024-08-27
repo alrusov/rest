@@ -54,10 +54,17 @@ func (proc *ProcOptions) do() (result any, code int, err error) {
 
 	defer func() {
 		success := err == nil && (code/100 <= 2)
+		if success {
+			res, _ := result.(*ExecResult)
+			if res != nil {
+				success = res.FailedRows == 0
+			}
+		}
+
 		e := proc.finishTransaction(success)
 		if err == nil && e != nil {
 			err = e
-			return
+			result = nil
 		}
 	}()
 
