@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"io"
 	"math"
+	"net/http"
 	"reflect"
 
 	"github.com/alrusov/jsonw"
@@ -281,6 +282,8 @@ func (br *ByRow) Close() (err error) {
 		if err != nil {
 			msgs.AddError(err)
 		}
+	} else {
+		br.proc.W.WriteHeader(http.StatusNoContent)
 	}
 
 	err = msgs.Error()
@@ -311,6 +314,7 @@ func (br *ByRow) Flush() (err error) {
 			w.Header().Set(n, v)
 		}
 
+		w.WriteHeader(http.StatusOK)
 	}
 
 	_, err = w.Write(br.buf.Bytes())

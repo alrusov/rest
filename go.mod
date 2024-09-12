@@ -11,7 +11,7 @@ require (
 	github.com/alrusov/log v0.1.39
 	github.com/alrusov/misc v1.1.15
 	github.com/alrusov/shaping v0.1.0
-	github.com/alrusov/stdhttp v0.1.120
+	github.com/alrusov/stdhttp v0.1.122
 	github.com/getkin/kin-openapi v0.127.0
 	github.com/jmoiron/sqlx v1.4.0
 )
