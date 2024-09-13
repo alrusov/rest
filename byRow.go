@@ -106,11 +106,11 @@ func (br *ByRow) Do() (err error) {
 	rows := br.proc.DBqueryRows
 
 	srcTp := br.proc.responseSouceType()
-	r := reflect.New(srcTp).Interface()
 
 	// Обработка
 
 	for {
+		r := reflect.New(srcTp).Interface()
 		exists := rows.Next()
 		if !exists {
 			err = rows.Err()
