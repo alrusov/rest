@@ -324,17 +324,15 @@ func (proc *ProcOptions) save(forUpdate bool, addBlank bool) (result any, code i
 		return
 	}
 
-	var stdExecResult *db.Result
-	stdExecResult, err = proc.db.ExecTxEx(proc.dbTx, returnsObj, proc.DBqueryName, patternType, startIdx, fieldNames, proc.DBqueryVars)
+	var dbResult *db.Result
+	dbResult, err = proc.db.ExecTxEx(proc.dbTx, returnsObj, proc.DBqueryName, patternType, startIdx, fieldNames, proc.DBqueryVars)
 
 	if err != nil {
 		code = http.StatusInternalServerError
 		return
 	}
 
-	execResult.TotalRows = uint64(len(proc.Fields))
-
-	err = execResult.DbResultParser(stdExecResult, returnsObj)
+	err = execResult.DbResultParser(dbResult, returnsObj)
 	if err != nil {
 		code = http.StatusInternalServerError
 		return
@@ -555,7 +553,6 @@ func (proc *ProcOptions) makeQueryVars(forUpdate bool) (startIdx int, fieldNames
 // Delete -- удалить
 func (proc *ProcOptions) Delete() (result any, code int, err error) {
 	execResult := NewExecResult()
-	execResult.TotalRows = 1
 	resultRow := NewExecResultRow()
 	execResult.AddRow(resultRow)
 
@@ -577,7 +574,7 @@ func (proc *ProcOptions) Delete() (result any, code int, err error) {
 		returnsObj = &requestRes.Rows
 	}
 
-	var stdExecResult *db.Result
+	var dbResult *db.Result
 
 	// Делаем запрос
 
@@ -586,14 +583,14 @@ func (proc *ProcOptions) Delete() (result any, code int, err error) {
 		return
 	}
 
-	stdExecResult, err = proc.db.ExecTxEx(proc.dbTx, returnsObj, proc.DBqueryName, db.PatternTypeNone, 0, nil, proc.DBqueryVars)
+	dbResult, err = proc.db.ExecTxEx(proc.dbTx, returnsObj, proc.DBqueryName, db.PatternTypeNone, 0, nil, proc.DBqueryVars)
 
 	if err != nil {
 		code = http.StatusInternalServerError
 		return
 	}
 
-	err = execResult.DbResultParser(stdExecResult, returnsObj)
+	err = execResult.DbResultParser(dbResult, returnsObj)
 	if err != nil {
 		code = http.StatusInternalServerError
 		return
@@ -762,8 +759,13 @@ func (proc *ProcOptions) after() (result any, code int, err error) {
 //----------------------------------------------------------------------------------------------------------------------------//
 
 func (execResult *ExecResult) MultiDefer(pResult *any, pCode *int, pErr *error) {
-	if *pResult != nil || *pCode != 0 {
-		return
+	if *pResult != nil {
+		er, ok := (*pResult).(*ExecResult)
+		if !ok {
+			return
+		}
+
+		execResult = er
 	}
 
 	if *pErr != nil {
@@ -777,12 +779,28 @@ func (execResult *ExecResult) MultiDefer(pResult *any, pCode *int, pErr *error) 
 			r.AddError(*pErr)
 		}
 
-		execResult.TotalRows = uint64(len(execResult.Rows))
-		execResult.FailedRows = execResult.TotalRows
+	}
+
+	execResult.TotalRows = uint64(len(execResult.Rows))
+	execResult.SuccessRows = 0
+	execResult.FailedRows = 0
+	*pCode = 0
+
+	for _, r := range execResult.Rows {
+		if *pCode == 0 {
+			*pCode = r.Code
+		} else if r.Code != *pCode {
+			*pCode = http.StatusMultiStatus
+		}
+
+		if r.Code/100 <= 2 {
+			execResult.SuccessRows++
+		} else {
+			execResult.FailedRows++
+		}
 	}
 
 	*pResult = execResult
-	*pCode = http.StatusMultiStatus
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//
@@ -923,7 +941,6 @@ func (execResult *ExecResult) DbResultParser(dbExecResult *db.Result, returnsObj
 		}
 	}
 
-	execResult.FailedRows = execResult.TotalRows - execResult.SuccessRows
 	return
 }
 
