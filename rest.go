@@ -2,6 +2,7 @@ package rest
 
 import (
 	"fmt"
+	"maps"
 	"net/http"
 	"reflect"
 	"slices"
@@ -112,7 +113,7 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 			}
 
 			result = cd.result
-			proc.ExtraHeaders = cd.headers
+			proc.ExtraHeaders = maps.Clone(cd.headers)
 			code = resCode
 			return
 		}

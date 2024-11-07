@@ -18,8 +18,8 @@ github.com/alrusov/loadavg v0.1.6 h1:dnq73CX2DBQ5XP+eWvmF3DzBLm7Qwnz23+BllEyKGng
 github.com/alrusov/loadavg v0.1.6/go.mod h1:wF1t1fzJNM0wyJV/j1lrTcdWWzjOymD0E9GPUxoIpMA=
 github.com/alrusov/log v0.1.39 h1:2OLNZXUA0/IqZi90/Ka5dKLGNNTMvp8tBOK438+WaQQ=
 github.com/alrusov/log v0.1.39/go.mod h1:jbbezpAINf5RnacAbG4jkJCtG/HVzEX56tW+HudK6tk=
-github.com/alrusov/misc v1.1.15 h1:EZZxAvgU+U6NkM+qrAENcDOrOJnofS5iEjfIaNAYVk4=
-github.com/alrusov/misc v1.1.15/go.mod h1:OaQ9hmhP7wLJoFxtW8Bx5daLhG/LlaDznpbXZso50qI=
+github.com/alrusov/misc v1.1.19 h1:UMoz/GV+PYxm1Myxrj0gySEfHfSA6vL9yTSoai/97NU=
+github.com/alrusov/misc v1.1.19/go.mod h1:fGbi2F6gX28+V+qDZJrzoiwH6sY5sB7zDl7eXulZa00=
 github.com/alrusov/panic v0.1.15 h1:b2IoZJySWdGUX+wXOXOF1dcxUXTYWeoRCt7x/ePZDwg=
 github.com/alrusov/panic v0.1.15/go.mod h1:YZ1wgCCIzqaPOnD5w2zJkpecV0DEfsClSgOVOEABKhY=
 github.com/alrusov/shaping v0.1.0 h1:Vm+xR7fnLidOa97BpGiTJUOfp9Df8Qj8QBAD607O3y4=
@@ -29,8 +29,8 @@ github.com/alrusov/stdhttp v0.1.122/go.mod h1:nRb2B8e8XAj4CtSyNzkD8eXJks19/116yO
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/getkin/kin-openapi v0.127.0 h1:Mghqi3Dhryf3F8vR370nN67pAERW+3a95vomb3MAREY=
-github.com/getkin/kin-openapi v0.127.0/go.mod h1:OZrfXzUfGrNbsKj+xmFBx6E5c6yH3At/tAKSc2UszXM=
+github.com/getkin/kin-openapi v0.128.0 h1:jqq3D9vC9pPq1dGcOCv7yOp1DaEe7c/T1vzcLbITSp4=
+github.com/getkin/kin-openapi v0.128.0/go.mod h1:OZrfXzUfGrNbsKj+xmFBx6E5c6yH3At/tAKSc2UszXM=
 github.com/go-openapi/jsonpointer v0.21.0 h1:YgdVicSA9vH5RiHs9TZW5oyafXZFc6+2Vc1rr/O9oNQ=
 github.com/go-openapi/jsonpointer v0.21.0/go.mod h1:IUyH9l/+uyhIYQ/PXVA41Rexl+kOkAPDdXEYns6fzUY=
 github.com/go-openapi/swag v0.23.0 h1:vsEVJDUo2hPJ2tu0/Xc+4noaxyEffXNIs3cOULZ+GrE=
