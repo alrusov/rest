@@ -760,6 +760,10 @@ func (proc *ProcOptions) after() (result any, code int, err error) {
 //----------------------------------------------------------------------------------------------------------------------------//
 
 func (execResult *ExecResult) MultiDefer(pResult *any, pCode *int, pErr *error) {
+	if *pCode == StatusProcessed {
+		return
+	}
+
 	if *pResult != nil {
 		er, ok := (*pResult).(*ExecResult)
 		if !ok {
