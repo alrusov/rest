@@ -1,6 +1,6 @@
 module github.com/alrusov/rest/v4
 
-go 1.23.3
+go 1.23.4
 
 require (
 	github.com/alrusov/auth v0.1.10

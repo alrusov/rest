@@ -282,7 +282,7 @@ func (br *ByRow) Close() (err error) {
 		if err != nil {
 			msgs.AddError(err)
 		}
-	} else {
+	} else if !br.failed {
 		br.proc.W.WriteHeader(http.StatusNoContent)
 	}
 
