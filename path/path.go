@@ -119,6 +119,7 @@ const (
 	FlagResponseIsNotArray       = Flags(0x00000004)
 	FlagUDqueriesReturnsID       = Flags(0x00000008)
 	FlagWithoutCU                = Flags(0x00000010)
+	FlagBodyReaderNeeded         = Flags(0x00000020)
 
 	FlagChainDefault    = Flags(0x00000001)
 	FlagChainEnableTail = Flags(0x00000002)

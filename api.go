@@ -82,38 +82,44 @@ func HandlerEx(find FindModule, extra any, h *stdhttp.HTTP, id uint64, prefix st
 
 	proc.Scope = proc.Chain.Scope
 
-	// Получаем тело запроса (в разжатом виде, если оно было gz)
-	bodyBuf, code, err := stdhttp.ReadRequestBody(r)
+	proc.BodyReader, err = stdhttp.NewBodyReader(r.Header, r.Body)
 	if err != nil {
-		proc.reply(nil, code, err)
+		proc.reply(nil, http.StatusInternalServerError, err)
 		return
 	}
 
-	r.Body.Close()
-	r.Body = nil
+	if proc.ChainLocal.Params.Flags&path.FlagBodyReaderNeeded == 0 {
+		bodyBuf := new(bytes.Buffer)
+		_, err = bodyBuf.ReadFrom(proc.BodyReader)
+		if err != nil {
+			proc.reply(nil, code, err)
+			return
+		}
 
-	proc.RawBody = bodyBuf.Bytes()
+		r.Body = nil
+		proc.RawBody = bodyBuf.Bytes()
 
-	// Парсим тело
-	requestObject := proc.ChainLocal.Params.Request
+		// Парсим тело
+		requestObject := proc.ChainLocal.Params.Request
 
-	if len(proc.RawBody) != 0 && requestObject.Pattern != nil {
-		proc.RawBody = bytes.TrimSpace(proc.RawBody)
-		proc.RequestParams = reflect.New(
-			reflect.SliceOf(requestObject.Type),
-		).Interface()
+		if len(proc.RawBody) != 0 && requestObject.Pattern != nil {
+			proc.RawBody = bytes.TrimSpace(proc.RawBody)
+			proc.RequestParams = reflect.New(
+				reflect.SliceOf(requestObject.Type),
+			).Interface()
 
-		switch requestObject.ContentType {
-		case stdhttp.ContentTypeJSON:
-			if len(proc.RawBody) > 0 && proc.RawBody[0] != '[' {
-				proc.RawBody = bytes.Join([][]byte{{'['}, proc.RawBody, {']'}}, []byte{})
-			}
+			switch requestObject.ContentType {
+			case stdhttp.ContentTypeJSON:
+				if len(proc.RawBody) > 0 && proc.RawBody[0] != '[' {
+					proc.RawBody = bytes.Join([][]byte{{'['}, proc.RawBody, {']'}}, []byte{})
+				}
 
-			err = jsonw.Unmarshal(proc.RawBody, &proc.RequestParams)
-			if err != nil {
-				code = http.StatusBadRequest
-				proc.reply(result, code, err)
-				return
+				err = jsonw.Unmarshal(proc.RawBody, &proc.RequestParams)
+				if err != nil {
+					code = http.StatusBadRequest
+					proc.reply(result, code, err)
+					return
+				}
 			}
 		}
 	}

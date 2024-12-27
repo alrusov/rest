@@ -37,7 +37,7 @@ type (
 	RowData struct {
 		Prefix    []byte // Дополнительный блок цикла, который может возвращаться из ByRowTuner и пишется перед основными данными
 		Suffix    []byte // Дополнительный блок цикла, который может возвращаться из ByRowTuner и пишется после основных данных
-		Delimiter []byte // Разделитель строк
+		Separator []byte // Разделитель строк
 		Data      any    // Основные данные цикла
 	}
 
@@ -51,7 +51,7 @@ const (
 var (
 	ByRowDefautlBegin     = []byte{'['}
 	ByRowDefautlEnd       = []byte{']'}
-	ByRowDefaultDelimiter = []byte{','}
+	ByRowDefaultSeparator = []byte{','}
 )
 
 //----------------------------------------------------------------------------------------------------------------------------//
@@ -144,7 +144,7 @@ func (br *ByRow) Do() (err error) {
 				{
 					Prefix:    nil,
 					Suffix:    nil,
-					Delimiter: ByRowDefaultDelimiter,
+					Separator: ByRowDefaultSeparator,
 					Data:      r,
 				},
 			}
@@ -164,8 +164,8 @@ func (br *ByRow) Do() (err error) {
 		for i, rd := range br.Data {
 			if i > 0 || br.RowNum > 0 {
 				// Пишем разделитель
-				if rd.Delimiter != nil {
-					_, err = br.writer.Write(rd.Delimiter)
+				if rd.Separator != nil {
+					_, err = br.writer.Write(rd.Separator)
 					if err != nil {
 						return
 					}
