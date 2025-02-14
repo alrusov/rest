@@ -44,6 +44,7 @@ type (
 	}
 
 	FuncInit        func(info *Info) (err error)
+	FuncPrepare     func(proc *ProcOptions) (result any, code int, err error)
 	FuncBefore      func(proc *ProcOptions) (result any, code int, err error)
 	FuncAfter       func(proc *ProcOptions) (result any, code int, err error)
 	FuncResultTuner func(proc *ProcOptions, result0 any, code0 int, err0 error) (result any, code int, err error)
@@ -62,8 +63,9 @@ type (
 		WithTransactions bool            // Разрешить транзакции
 		QueryPrefix      string          // Префикс имени запроса в базу
 		Init             FuncInit        // User defined Init
-		Before           FuncBefore      // User defined Before query
-		After            FuncAfter       // User defined After query
+		Prepare          FuncPrepare     // User defined Prepare function
+		Before           FuncBefore      // User defined Before function
+		After            FuncAfter       // User defined After function
 		shaping          *shaping.S      // Shaper
 		ResultTuner      FuncResultTuner // The last step result tuner
 	}
@@ -91,6 +93,7 @@ type (
 		QueryParams      any                 // Query параметры
 		QueryParamsFound misc.BoolMap        // Query параметры, присутствующие в запросе в явном виде
 		RequestParams    any                 // Request параметры
+		DBtype           string              // Тип базы, если надо изменить на время запроса. Если пусто, то из info
 		db               *db.DB              // database connection
 		dbTx             *sqlx.Tx            // database transaction
 		DBqueryName      string              // Имя запроса к базе данных
@@ -426,7 +429,7 @@ func (m *MessagesBlock) AddMessages(ss []string) {
 	}
 
 	for _, s := range ss {
-		m.AddMessage(s)
+		m.AddMessage("%s", s) // to appease the vet
 	}
 }
 

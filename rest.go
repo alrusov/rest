@@ -46,7 +46,16 @@ func (proc *ProcOptions) rest() (result any, code int, err error) {
 
 // Обработка
 func (proc *ProcOptions) do() (result any, code int, err error) {
-	// start/finish transaction
+	result, code, err = proc.prepare()
+	if err != nil {
+		if code == 0 {
+			code = http.StatusUnprocessableEntity
+		}
+		return
+	}
+	if code != 0 || result != nil {
+		return
+	}
 
 	err = proc.beginTransaction()
 	if err != nil {
@@ -699,6 +708,25 @@ func (info *Info) makeParamsDescription() (err error) {
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
+func (proc *ProcOptions) prepare() (result any, code int, err error) {
+	if proc.Info.Prepare != nil {
+		result, code, err = proc.Info.Prepare(proc)
+		if err != nil {
+			if code == 0 {
+				code = http.StatusUnprocessableEntity
+			}
+			return
+		}
+		if code != 0 || result != nil {
+			return
+		}
+	}
+
+	return
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
 func (proc *ProcOptions) before() (result any, code int, err error) {
 	if proc.Info.Before != nil {
 		result, code, err = proc.Info.Before(proc)
@@ -815,7 +843,12 @@ func (proc *ProcOptions) setDB() (err error) {
 		return
 	}
 
-	proc.db, err = db.GetDB(proc.Info.DBtype)
+	tp := proc.DBtype
+	if tp == "" {
+		tp = proc.Info.DBtype
+	}
+
+	proc.db, err = db.GetDB(tp)
 	if err != nil {
 		return
 	}
@@ -832,7 +865,7 @@ func (proc *ProcOptions) GetDB() (db *db.DB, tx *sqlx.Tx) {
 //----------------------------------------------------------------------------------------------------------------------------//
 
 func (proc *ProcOptions) beginTransaction() (err error) {
-	if proc.Info.DBtype == "" {
+	if proc.Info.DBtype == "" && proc.DBtype == "" {
 		return
 	}
 
@@ -859,7 +892,7 @@ func (proc *ProcOptions) beginTransaction() (err error) {
 }
 
 func (proc *ProcOptions) finishTransaction(success bool) (err error) {
-	if !proc.Info.WithTransactions || proc.Info.DBtype == "" {
+	if !proc.Info.WithTransactions || (proc.Info.DBtype == "" && proc.DBtype == "") {
 		return
 	}
 
