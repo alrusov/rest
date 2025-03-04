@@ -18,8 +18,8 @@ github.com/alrusov/loadavg v0.1.6 h1:dnq73CX2DBQ5XP+eWvmF3DzBLm7Qwnz23+BllEyKGng
 github.com/alrusov/loadavg v0.1.6/go.mod h1:wF1t1fzJNM0wyJV/j1lrTcdWWzjOymD0E9GPUxoIpMA=
 github.com/alrusov/log v0.1.39 h1:2OLNZXUA0/IqZi90/Ka5dKLGNNTMvp8tBOK438+WaQQ=
 github.com/alrusov/log v0.1.39/go.mod h1:jbbezpAINf5RnacAbG4jkJCtG/HVzEX56tW+HudK6tk=
-github.com/alrusov/misc v1.1.20 h1:vrDFR3LaOvaQQ8fKaXBIpR4UE87akIOXZLyc+l44q3g=
-github.com/alrusov/misc v1.1.20/go.mod h1:fGbi2F6gX28+V+qDZJrzoiwH6sY5sB7zDl7eXulZa00=
+github.com/alrusov/misc v1.1.21 h1:Ww8MCZ/t+wvoyIJkozbrhoNm1B5p5Fb8gBq7xrR6nf8=
+github.com/alrusov/misc v1.1.21/go.mod h1:mCnI3ldCu7qvNXso+JTIVVmU0brskZpIjJSvc6fb8zo=
 github.com/alrusov/panic v0.1.15 h1:b2IoZJySWdGUX+wXOXOF1dcxUXTYWeoRCt7x/ePZDwg=
 github.com/alrusov/panic v0.1.15/go.mod h1:YZ1wgCCIzqaPOnD5w2zJkpecV0DEfsClSgOVOEABKhY=
 github.com/alrusov/shaping v0.1.0 h1:Vm+xR7fnLidOa97BpGiTJUOfp9Df8Qj8QBAD607O3y4=

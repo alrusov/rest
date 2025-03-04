@@ -401,6 +401,10 @@ func scanQueryParams(proc *ProcOptions, t reflect.Type, v reflect.Value, nameMap
 	for i := 0; i < ln; i++ {
 		fieldT := t.Field(i)
 
+		if !fieldT.IsExported() {
+			continue
+		}
+
 		if fieldT.Type.Kind() == reflect.Struct && fieldT.Anonymous {
 			scanQueryParams(proc, fieldT.Type, v.Field(i), nameMap)
 			continue
