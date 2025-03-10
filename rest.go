@@ -53,7 +53,7 @@ func (proc *ProcOptions) do() (result any, code int, err error) {
 		}
 		return
 	}
-	if code != 0 || result != nil {
+	if code != 0 || !misc.IsNil(result) {
 		return
 	}
 
@@ -143,7 +143,7 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 		}
 		return
 	}
-	if code != 0 || result != nil {
+	if code != 0 || !misc.IsNil(result) {
 		return
 	}
 
@@ -243,7 +243,7 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 			continue
 		}
 
-		if code != 0 || result != nil {
+		if code != 0 || !misc.IsNil(result) {
 			return
 		}
 
@@ -299,7 +299,7 @@ func (proc *ProcOptions) save(forUpdate bool, addBlank bool) (result any, code i
 	}
 
 	result, code, err = proc.before()
-	if code != 0 || result != nil || err != nil {
+	if code != 0 || !misc.IsNil(result) || err != nil {
 		return
 	}
 
@@ -351,7 +351,7 @@ func (proc *ProcOptions) save(forUpdate bool, addBlank bool) (result any, code i
 	proc.ExecResult = execResult
 
 	result, code, err = proc.after()
-	if code != 0 || result != nil || err != nil {
+	if code != 0 || !misc.IsNil(result) || err != nil {
 		return
 	}
 
@@ -571,7 +571,7 @@ func (proc *ProcOptions) Delete() (result any, code int, err error) {
 	}()
 
 	result, code, err = proc.before()
-	if code != 0 || result != nil || err != nil {
+	if code != 0 || !misc.IsNil(result) || err != nil {
 		return
 	}
 
@@ -609,7 +609,7 @@ func (proc *ProcOptions) Delete() (result any, code int, err error) {
 	proc.ExecResult = execResult
 
 	result, code, err = proc.after()
-	if code != 0 || result != nil || err != nil {
+	if code != 0 || !misc.IsNil(result) || err != nil {
 		return
 	}
 
@@ -627,7 +627,7 @@ func (proc *ProcOptions) Others() (result any, code int, err error) {
 		}
 		return
 	}
-	if code != 0 || result != nil {
+	if code != 0 || !misc.IsNil(result) {
 		return
 	}
 
@@ -638,7 +638,7 @@ func (proc *ProcOptions) Others() (result any, code int, err error) {
 		}
 		return
 	}
-	if code != 0 || result != nil {
+	if code != 0 || !misc.IsNil(result) {
 		return
 	}
 
@@ -717,7 +717,7 @@ func (proc *ProcOptions) prepare() (result any, code int, err error) {
 			}
 			return
 		}
-		if code != 0 || result != nil {
+		if code != 0 || !misc.IsNil(result) {
 			return
 		}
 	}
@@ -736,7 +736,7 @@ func (proc *ProcOptions) before() (result any, code int, err error) {
 			}
 			return
 		}
-		if code != 0 || result != nil {
+		if code != 0 || !misc.IsNil(result) {
 			return
 		}
 	}
@@ -748,7 +748,7 @@ func (proc *ProcOptions) before() (result any, code int, err error) {
 		}
 		return
 	}
-	if code != 0 || result != nil {
+	if code != 0 || !misc.IsNil(result) {
 		return
 	}
 
@@ -765,7 +765,7 @@ func (proc *ProcOptions) after() (result any, code int, err error) {
 		}
 		return
 	}
-	if code != 0 || result != nil {
+	if code != 0 || !misc.IsNil(result) {
 		return
 	}
 
@@ -777,7 +777,7 @@ func (proc *ProcOptions) after() (result any, code int, err error) {
 			}
 			return
 		}
-		if code != 0 || result != nil {
+		if code != 0 || !misc.IsNil(result) {
 			return
 		}
 	}

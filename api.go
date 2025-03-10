@@ -72,7 +72,7 @@ func HandlerEx(find FindModule, extra any, h *stdhttp.HTTP, id uint64, prefix st
 
 	proc.Chain, proc.PathParams, result, code, err = module.Info.Methods.Find(r.Method, tail)
 
-	if err != nil || code != 0 || result != nil {
+	if err != nil || code != 0 || !misc.IsNil(result) {
 		proc.reply(result, code, err)
 		return
 	}
@@ -214,7 +214,7 @@ func (proc *ProcOptions) reply(result any, code int, err error) {
 		}
 
 	case 0:
-		if result != nil {
+		if !misc.IsNil(result) {
 			v := reflect.ValueOf(result)
 			k := v.Kind()
 			if k == reflect.Pointer {
@@ -228,7 +228,7 @@ func (proc *ProcOptions) reply(result any, code int, err error) {
 
 		if err != nil {
 			code = http.StatusInternalServerError
-		} else if result == nil {
+		} else if misc.IsNil(result) {
 			code = http.StatusNoContent
 		} else {
 			code = http.StatusOK
@@ -268,7 +268,7 @@ func (proc *ProcOptions) reply(result any, code int, err error) {
 		}
 
 	} else {
-		if result == nil {
+		if misc.IsNil(result) {
 			result = struct{}{}
 		}
 
