@@ -72,42 +72,42 @@ type (
 
 	// Опции запроса к методу
 	ProcOptions struct {
-		handler          API                 // Интерфейс метода
-		LogFacility      *log.Facility       // Предпочтительная facility для логирования
-		H                *stdhttp.HTTP       // HTTP листенер
-		LogSrc           string              // Строка с ID запроса для MessageWithSource
-		Info             *Info               // Информация о методе
-		ID               uint64              // ID запроса
-		Prefix           string              // Префикс пути запроса (при работе через прокси)
-		Path             string              // Путь запроса
-		Tail             []string            // Остаток пути
-		R                *http.Request       // Запрос
-		W                http.ResponseWriter // Интерфейс для ответа
-		AuthIdentity     *auth.Identity      // Результаты аутентификации
-		Chain            *path.Chain         // Обрабатываемая цепочка
-		ChainLocal       path.Chain          // Копия Chain для возможности ее модификации для работы с динамическими объектами. Рекомендуется использовать её, а не Chain.Parent
-		Scope            string              // Обрабатываемый Scope
-		RawBody          []byte              // Тело запроса. В R.Body уже nil!
-		BodyReader       io.ReadCloser       // Body reader
-		PathParams       any                 // Path параметры
-		QueryParams      any                 // Query параметры
-		QueryParamsFound misc.BoolMap        // Query параметры, присутствующие в запросе в явном виде
-		RequestParams    any                 // Request параметры
-		DBtype           string              // Тип базы, если надо изменить на время запроса. Если пусто, то из info
-		db               *db.DB              // database connection
-		dbTx             *sqlx.Tx            // database transaction
-		DBqueryName      string              // Имя запроса к базе данных
-		DBqueryVars      []any               // Переменные для формирования запроса
-		ResultAsRows     bool                // Возвращать для GET не готовый результат, а *sqlx.Rows, чтобы производить разбор самостоятельно. Актуально для больших результатов.
-		DBqueryResult    any                 // Результат выполненения запроса (указатель на слайс) при ResultAsRows==false
-		DBqueryRows      *sqlx.Rows          // Результат при ResultAsRows==true
-		Fields           []misc.InterfaceMap // Поля (имя из sql запроса) для insert или update. Для select - список полей для выборки из базы, если нужны не все из объекта
-		ExcludedFields   misc.StringMap      // Поля ([name]db_name), которые надо исключить из запроса
-		ExecResult       *ExecResult         // Результат выполнения Exec
-		ExtraHeaders     misc.StringMap      // Дополнительные возвращаемые HTTP заголовки
-
-		Extra  any // Произвольные данные от вызывающего
-		Custom any // Произвольные пользовательские данные
+		handler            API                 // Интерфейс метода
+		LogFacility        *log.Facility       // Предпочтительная facility для логирования
+		H                  *stdhttp.HTTP       // HTTP листенер
+		LogSrc             string              // Строка с ID запроса для MessageWithSource
+		Info               *Info               // Информация о методе
+		ID                 uint64              // ID запроса
+		Prefix             string              // Префикс пути запроса (при работе через прокси)
+		Path               string              // Путь запроса
+		Tail               []string            // Остаток пути
+		R                  *http.Request       // Запрос
+		W                  http.ResponseWriter // Интерфейс для ответа
+		AuthIdentity       *auth.Identity      // Результаты аутентификации
+		Chain              *path.Chain         // Обрабатываемая цепочка
+		ChainLocal         path.Chain          // Копия Chain для возможности ее модификации для работы с динамическими объектами. Рекомендуется использовать её, а не Chain.Parent
+		Scope              string              // Обрабатываемый Scope
+		RawBody            []byte              // Тело запроса. В R.Body уже nil!
+		BodyReader         io.ReadCloser       // Body reader
+		PathParams         any                 // Path параметры
+		QueryParams        any                 // Query параметры
+		QueryParamsFound   misc.BoolMap        // Query параметры, присутствующие в запросе в явном виде
+		RequestParams      any                 // Request параметры
+		DBtype             string              // Тип базы, если надо изменить на время запроса. Если пусто, то из info
+		db                 *db.DB              // database connection
+		dbTx               *sqlx.Tx            // database transaction
+		DBqueryName        string              // Имя запроса к базе данных
+		DBqueryVars        []any               // Переменные для формирования запроса
+		ResultAsRows       bool                // Возвращать для GET не готовый результат, а *sqlx.Rows, чтобы производить разбор самостоятельно. Актуально для больших результатов.
+		DBqueryResult      any                 // Результат выполненения запроса (указатель на слайс) при ResultAsRows==false
+		DBqueryRows        *sqlx.Rows          // Результат при ResultAsRows==true
+		Fields             []misc.InterfaceMap // Поля (имя из sql запроса) для insert или update. Для select - список полей для выборки из базы, если нужны не все из объекта
+		ExcludedFields     misc.StringMap      // Поля ([name]db_name), которые надо исключить из запроса
+		InternalExecResult *ExecResult         // Внутренний промежуточный результат выполнения
+		ExecResult         *ExecResult         // Результат выполнения Exec
+		ExtraHeaders       misc.StringMap      // Дополнительные возвращаемые HTTP заголовки
+		Extra              any                 // Произвольные данные от вызывающего
+		Custom             any                 // Произвольные пользовательские данные
 	}
 
 	// Обработчик
@@ -420,7 +420,7 @@ func (m *MessagesBlock) AddMessage(s string, params ...any) {
 		return
 	}
 
-	m.errors = append(m.errors, fmt.Errorf(s, params...))
+	m.Messages = append(m.Messages, fmt.Sprintf(s, params...))
 }
 
 func (m *MessagesBlock) AddMessages(ss []string) {
@@ -447,7 +447,9 @@ func (m *MessagesBlock) FillMessages() {
 		return
 	}
 
-	m.Messages = make([]string, 0, ln)
+	if len(m.Messages) == 0 {
+		m.Messages = make([]string, 0, ln)
+	}
 
 	for _, e := range m.errors {
 		m.Messages = append(m.Messages, e.Error())

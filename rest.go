@@ -286,13 +286,13 @@ func (proc *ProcOptions) Patch() (result any, code int, err error) {
 
 // common save
 func (proc *ProcOptions) save(forUpdate bool, addBlank bool) (result any, code int, err error) {
-	execResult := NewExecResult()
+	proc.InternalExecResult = NewExecResult()
 
 	defer func() {
-		execResult.MultiDefer(&result, &code, &err)
+		proc.InternalExecResult.MultiDefer(&result, &code, &err)
 	}()
 
-	err = proc.prepareFields(execResult, addBlank)
+	err = proc.prepareFields(proc.InternalExecResult, addBlank)
 	if err != nil {
 		code = http.StatusBadRequest
 		return
@@ -303,7 +303,7 @@ func (proc *ProcOptions) save(forUpdate bool, addBlank bool) (result any, code i
 		return
 	}
 
-	ok := proc.checkFields(forUpdate, execResult)
+	ok := proc.checkFields(forUpdate, proc.InternalExecResult)
 	if !ok {
 		return
 	}
@@ -342,13 +342,13 @@ func (proc *ProcOptions) save(forUpdate bool, addBlank bool) (result any, code i
 		return
 	}
 
-	err = execResult.DbResultParser(dbResult, returnsObj)
+	err = proc.InternalExecResult.DbResultParser(dbResult, returnsObj)
 	if err != nil {
 		code = http.StatusInternalServerError
 		return
 	}
 
-	proc.ExecResult = execResult
+	proc.ExecResult = proc.InternalExecResult
 
 	result, code, err = proc.after()
 	if code != 0 || !misc.IsNil(result) || err != nil {

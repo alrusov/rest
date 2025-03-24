@@ -852,7 +852,9 @@ func (p *Params) extractFieldsFromBodyIterator(base string, fields *misc.Interfa
 		default:
 			dbName, exists := p.Request.FlatModel[fName]
 			if !exists {
-				messages = append(messages, fmt.Sprintf(`unknown field "%s"`, fName))
+				if _, exists = p.Request.ReadonlyFields[fName]; !exists {
+					messages = append(messages, fmt.Sprintf(`unknown field "%s"`, fName))
+				}
 				continue
 			}
 			if dbName == "" {
