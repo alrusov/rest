@@ -405,6 +405,10 @@ func scanQueryParams(proc *ProcOptions, t reflect.Type, v reflect.Value, nameMap
 			continue
 		}
 
+		if misc.StructTagName(&fieldT, path.TagSkip) == "true" {
+			continue
+		}
+
 		if fieldT.Type.Kind() == reflect.Struct && fieldT.Anonymous {
 			scanQueryParams(proc, fieldT.Type, v.Field(i), nameMap)
 			continue

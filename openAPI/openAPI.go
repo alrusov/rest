@@ -857,6 +857,10 @@ func (proc *processor) makeParameters(t reflect.Type, in string) (pp []*oa.Param
 				return nil
 			}
 
+			if field.Tag.Get(path.TagSkip) == "true" {
+				return nil
+			}
+
 			if name == "" {
 				name = misc.StructTagName(field, path.TagJSON)
 				if name == "-" {

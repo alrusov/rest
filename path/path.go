@@ -139,6 +139,7 @@ const (
 	TagSample   = "sample"      // Sample field value
 	TagComment  = "comment"     // Field comment
 	TagRequired = "required"    // Is field required
+	TagSkip     = "skip"        // Is field skipped
 	TagReadonly = "readonly"    // Is field readonly
 	TagRole     = "role"        // Field role (see Role* below)
 	TagRef      = "ref"         // OpenAPI ref
