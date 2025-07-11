@@ -101,9 +101,10 @@ func ModuleRegistration(handler API) (err error) {
 		return
 	}
 
-	if info.DBtype == "" {
+	switch info.DBtype {
+	case "":
 		info.DBtype = defDB
-	} else if info.DBtype == DBtypeNone {
+	case DBtypeNone:
 		info.DBtype = ""
 	}
 

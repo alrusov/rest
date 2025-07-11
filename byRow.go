@@ -98,7 +98,7 @@ func (br *ByRow) Do() (err error) {
 	}
 
 	// Если нужен gzip, то добавляем упаковку
-	if stdhttp.UseGzip(br.proc.R, math.MaxInt, br.proc.ExtraHeaders) {
+	if stdhttp.UseGzip(br.proc.R, math.MaxInt, &br.proc.ExtraHeaders) {
 		br.writer = gzip.NewWriter(br)
 		br.withGzip = true
 	}
@@ -307,7 +307,7 @@ func (br *ByRow) Flush() (err error) {
 
 		br.proc.ExtraHeaders["X-Content-Type-Options"] = "nosniff"
 		if br.withGzip {
-			br.proc.ExtraHeaders["Content-Encoding"] = "gzip"
+			br.proc.ExtraHeaders[stdhttp.HTTPheaderContentEncoding] = stdhttp.ContentEncodingGzip
 		}
 
 		for n, v := range br.proc.ExtraHeaders {

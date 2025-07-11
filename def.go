@@ -5,7 +5,6 @@ package rest
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 	"reflect"
 	"slices"
@@ -88,7 +87,6 @@ type (
 		ChainLocal         path.Chain          // Копия Chain для возможности ее модификации для работы с динамическими объектами. Рекомендуется использовать её, а не Chain.Parent
 		Scope              string              // Обрабатываемый Scope
 		RawBody            []byte              // Тело запроса. В R.Body уже nil!
-		BodyReader         io.ReadCloser       // Body reader
 		PathParams         any                 // Path параметры
 		QueryParams        any                 // Query параметры
 		QueryParamsFound   misc.BoolMap        // Query параметры, присутствующие в запросе в явном виде

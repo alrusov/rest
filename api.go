@@ -82,15 +82,9 @@ func HandlerEx(find FindModule, extra any, h *stdhttp.HTTP, id uint64, prefix st
 
 	proc.Scope = proc.Chain.Scope
 
-	proc.BodyReader, err = stdhttp.NewBodyReader(r.Header, r.Body)
-	if err != nil {
-		proc.reply(nil, http.StatusInternalServerError, err)
-		return
-	}
-
-	if proc.ChainLocal.Params.Flags&path.FlagBodyReaderNeeded == 0 {
+	if proc.ChainLocal.Params.Flags&path.FlagDontReadBody == 0 {
 		bodyBuf := new(bytes.Buffer)
-		_, err = bodyBuf.ReadFrom(proc.BodyReader)
+		_, err = bodyBuf.ReadFrom(r.Body)
 		if err != nil {
 			proc.reply(nil, code, err)
 			return
@@ -118,6 +112,7 @@ func HandlerEx(find FindModule, extra any, h *stdhttp.HTTP, id uint64, prefix st
 				if err != nil {
 					code = http.StatusBadRequest
 					proc.reply(result, code, err)
+					Log.Message(log.ERR, "%s\n%v\n%s", err, proc.R.Header, proc.RawBody)
 					return
 				}
 			}
