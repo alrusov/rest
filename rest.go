@@ -129,9 +129,10 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 
 		defer func() {
 			cd := cachedData{
-				headers: proc.ExtraHeaders,
+				headers: maps.Clone(proc.ExtraHeaders),
 				result:  result,
 			}
+			delete(cd.headers, stdhttp.HTTPheaderContentEncoding)
 			ce.Commit(proc.ID, cd, code, proc.ChainLocal.CacheLifetime)
 		}()
 	}
