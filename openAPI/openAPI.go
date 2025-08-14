@@ -311,7 +311,11 @@ func (proc *processor) serverURL() (server string, err error) {
 	port := uint64(proc.oaCfg.Port)
 
 	if host == "" || port == 0 {
-		addr := strings.Split(proc.httpCfg.Addr, ":")
+		bindAddr := proc.httpCfg.Addr
+		if misc.IsDebug() && proc.httpCfg.DebugAddr != "" {
+			bindAddr = proc.httpCfg.DebugAddr
+		}
+		addr := strings.Split(bindAddr, ":")
 		if host == "" {
 			host = addr[0]
 			if host == "" {
