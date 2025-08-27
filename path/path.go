@@ -163,6 +163,7 @@ var (
 
 func (set *Set) Prepare() (err error) {
 	msgs := misc.NewMessages()
+	defer msgs.Free()
 
 	if set.Methods[stdhttp.MethodPUT] == nil && set.Methods[stdhttp.MethodPATCH] != nil {
 		set.Methods[stdhttp.MethodPUT] = set.Methods[stdhttp.MethodPATCH].Clone()
@@ -214,6 +215,7 @@ func (chains *Chains) Prepare(m string) (err error) {
 	msgs := misc.NewMessages()
 	defer func() {
 		err = msgs.Error()
+		msgs.Free()
 	}()
 
 	if chains.prepared {
@@ -317,6 +319,7 @@ func (chains *Chains) Prepare(m string) (err error) {
 func (chains *Chains) Find(path []string) (matched *Chain, pathParams any, code int, err error) {
 	code = 0
 	msgs := misc.NewMessages()
+	defer msgs.Free()
 
 	defer func() {
 		err = msgs.Error()

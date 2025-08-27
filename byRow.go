@@ -269,6 +269,7 @@ func (br *ByRow) Write(p []byte) (n int, err error) {
 
 func (br *ByRow) Close() (err error) {
 	msgs := misc.NewMessages()
+	defer msgs.Free()
 
 	if br.writer != br {
 		err = br.writer.Close()

@@ -231,6 +231,7 @@ func Start() (err error) {
 
 func lookingForUnusedConfigs() (err error) {
 	msgs := misc.NewMessages()
+	defer msgs.Free()
 
 	if !misc.TEST {
 		notProcessedTp := reflect.ValueOf(map[string]any{}).Type()

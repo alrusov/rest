@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/alrusov/jsonw"
@@ -40,21 +41,21 @@ func HandlerEx(find FindModule, extra any, h *stdhttp.HTTP, id uint64, prefix st
 
 	processed = true
 
-	proc := &ProcOptions{
-		handler:      module.Handler,
-		LogFacility:  module.LogFacility,
-		H:            h,
-		LogSrc:       fmt.Sprintf("%d", id),
-		Info:         module.Info,
-		ID:           id,
-		Prefix:       prefix,
-		Path:         urlPath,
-		Tail:         tail,
-		R:            r,
-		W:            w,
-		Extra:        extra,
-		ExtraHeaders: make(misc.StringMap, 8),
-	}
+	proc := newProcOptions()
+	defer proc.free()
+	proc.handler = module.Handler
+	proc.LogFacility = module.LogFacility
+	proc.H = h
+	proc.LogSrc = fmt.Sprintf("%d", id)
+	proc.Info = module.Info
+	proc.ID = id
+	proc.Prefix = prefix
+	proc.Path = urlPath
+	proc.Tail = tail
+	proc.R = r
+	proc.W = w
+	proc.Extra = extra
+	proc.ExtraHeaders = make(misc.StringMap, 8)
 
 	var err error
 	var result any
@@ -350,6 +351,7 @@ func (proc *ProcOptions) parseQueryParams(src url.Values) (err error) {
 	scanQueryParams(proc, paramsT, paramsV, nameMap)
 
 	msgs := misc.NewMessages()
+	defer msgs.Free()
 
 	for srcName, val := range src {
 		name, exists := nameMap[srcName]
@@ -531,6 +533,29 @@ func CheckPeriod(from time.Time, to time.Time, maxPeriod time.Duration, stdPerio
 	normFrom = from
 	normTo = to
 	return
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+var (
+	procOptionsPool = sync.Pool{
+		New: func() any {
+			return &ProcOptions{}
+		},
+	}
+)
+
+func newProcOptions() (proc *ProcOptions) {
+	return procOptionsPool.Get().(*ProcOptions)
+}
+
+var (
+	emptyProcOptions = ProcOptions{}
+)
+
+func (proc *ProcOptions) free() {
+	*proc = emptyProcOptions
+	procOptionsPool.Put(proc)
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//

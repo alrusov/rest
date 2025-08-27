@@ -108,6 +108,7 @@ var (
 // Проверка валидности OpenAPI
 func (x *Config) Check(cfg any) (err error) {
 	msgs := misc.NewMessages()
+	defer msgs.Free()
 
 	if x.APIversion == "" {
 		msgs.Add("undefined api-version")
@@ -141,6 +142,7 @@ func Compose(logFacility *log.Facility, cfg *Config, httpCfg *config.Listener, p
 		schemas: make(map[string]*oa.Schema, 1024),
 		msgs:    misc.NewMessages(),
 	}
+	defer proc.msgs.Free()
 
 	err = proc.prepare()
 	if err != nil {
