@@ -95,6 +95,7 @@ type (
 		RequiredFields  misc.StringMap    `json:"-"`                      // обязательные поля, ключ - путь до поля, значение - db name
 		ReadonlyFields  misc.StringMap    `json:"-"`                      // поля только на чтение, ключ - путь до поля, значение - db name
 		UniqueKeyFields []string          `json:"requestUniqueKeyFields"` // уникальные поля, первый - primary key (формально)
+		SkippedFields   misc.StringMap    `json:"-"`                      // поля для которых не производится стандартная обработка, ключ - путь до поля, значение - без разницы
 	}
 
 	ResponseParams struct {
@@ -135,7 +136,8 @@ const (
 	TagJSON     = "json"
 	TagDB       = db.TagDB      // Database field definition
 	TagDBAlt    = db.TagDBAlt   // Database field definition (alternative)
-	TagDefault  = db.TagDefault // default value
+	TagDefault  = db.TagDefault // Default value
+	TagSkipped  = "skipped"     // Skipped field
 	TagSample   = "sample"      // Sample field value
 	TagComment  = "comment"     // Field comment
 	TagRequired = "required"    // Is field required
@@ -232,7 +234,7 @@ func (chains *Chains) Prepare(m string) (err error) {
 
 	dstI := 0
 
-	for i := 0; i < len(chains.Chains); i++ {
+	for i := range len(chains.Chains) {
 		if chains.Chains[i] == nil {
 			continue
 		}
@@ -380,7 +382,7 @@ func (chains *Chains) Find(path []string) (matched *Chain, pathParams any, code 
 		return
 	}
 
-	for ci := 0; ci < len(chains.Chains); ci++ {
+	for ci := range len(chains.Chains) {
 		chain := chains.Chains[ci]
 
 		if len(chain.Tokens) < ln && chain.Flags&FlagChainEnableTail == 0 {
@@ -711,19 +713,11 @@ func (p *Params) typeFlatModelIterator(tagDB string, base string, model *misc.St
 
 	ln := t.NumField()
 
-	for i := 0; i < ln; i++ {
+	for i := range ln {
 		f := t.Field(i)
 
 		if !f.IsExported() {
 			continue
-		}
-
-		dbName := misc.StructTagName(&f, tagDB)
-		if dbName == "-" {
-			dbTags := misc.StructTagOpts(&f, tagDB)
-			if dbName = dbTags["clean"]; dbName == "" {
-				continue
-			}
 		}
 
 		fName := misc.StructTagName(&f, TagJSON)
@@ -740,6 +734,23 @@ func (p *Params) typeFlatModelIterator(tagDB string, base string, model *misc.St
 				fName = base
 			} else {
 				fName = base + "." + fName
+			}
+		}
+
+		skipped := misc.StructTagName(&f, TagSkipped)
+		if skipped == "true" {
+			if len(p.Request.SkippedFields) == 0 {
+				p.Request.SkippedFields = make(misc.StringMap, 16)
+			}
+			p.Request.SkippedFields[fName] = ""
+			continue
+		}
+
+		dbName := misc.StructTagName(&f, tagDB)
+		if dbName == "-" {
+			dbTags := misc.StructTagOpts(&f, tagDB)
+			if dbName = dbTags["clean"]; dbName == "" {
+				continue
 			}
 		}
 
@@ -856,9 +867,13 @@ func (p *Params) extractFieldsFromBodyIterator(base string, fields *misc.Interfa
 		default:
 			dbName, exists := p.Request.FlatModel[fName]
 			if !exists {
-				if _, exists = p.Request.ReadonlyFields[fName]; !exists {
-					messages = append(messages, fmt.Sprintf(`unknown field "%s"`, fName))
+				if _, exists = p.Request.ReadonlyFields[fName]; exists {
+					continue
 				}
+				if _, exists = p.Request.SkippedFields[fName]; exists {
+					continue
+				}
+				messages = append(messages, fmt.Sprintf(`unknown field "%s"`, fName))
 				continue
 			}
 			if dbName == "" {
