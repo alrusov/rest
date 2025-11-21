@@ -22,16 +22,17 @@ type (
 
 		Data []RowData
 
-		RowNum   int            // Количество выданных строк (увеличивается в конце обработки строки)
-		IsFinal  bool           // Финал, Tuner еще раз вызывается после завершения выборки, в первом параметре опять последнее значение
-		proc     *ProcOptions   //
-		tuner    ByRowTuner     //
-		withGzip bool           //
-		blockNum int            //
-		failed   bool           //
-		last     any            //
-		buf      *bytes.Buffer  //
-		writer   io.WriteCloser //
+		RowNum     int            // Количество выданных строк (увеличивается в конце обработки строки)
+		IsFinal    bool           // Финал, Tuner еще раз вызывается после завершения выборки, в первом параметре опять последнее значение
+		withWriter bool           // Hадо производить запись, иначе это делает сам tuner
+		proc       *ProcOptions   //
+		tuner      ByRowTuner     //
+		withGzip   bool           //
+		blockNum   int            //
+		failed     bool           //
+		last       any            //
+		buf        *bytes.Buffer  //
+		writer     io.WriteCloser //
 	}
 
 	RowData struct {
@@ -56,18 +57,19 @@ var (
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-func NewByRow(proc *ProcOptions, tuner ByRowTuner) (br *ByRow, err error) {
+func NewByRow(proc *ProcOptions, tuner ByRowTuner, withWriter bool) (br *ByRow, err error) {
 	br = &ByRow{
-		Begin:    ByRowDefautlBegin,
-		End:      ByRowDefautlEnd,
-		RowNum:   0,
-		IsFinal:  false,
-		proc:     proc,
-		tuner:    tuner,
-		withGzip: false,
-		blockNum: 0,
-		failed:   false,
-		buf:      new(bytes.Buffer),
+		Begin:      ByRowDefautlBegin,
+		End:        ByRowDefautlEnd,
+		RowNum:     0,
+		IsFinal:    false,
+		withWriter: withWriter,
+		proc:       proc,
+		tuner:      tuner,
+		withGzip:   false,
+		blockNum:   0,
+		failed:     false,
+		buf:        new(bytes.Buffer),
 	}
 
 	br.buf.Grow(blockBufferSize)
@@ -97,10 +99,12 @@ func (br *ByRow) Do() (err error) {
 		br.End = nil
 	}
 
-	// Если нужен gzip, то добавляем упаковку
-	if stdhttp.UseGzip(br.proc.R, math.MaxInt, &br.proc.ExtraHeaders) {
-		br.writer = gzip.NewWriter(br)
-		br.withGzip = true
+	if br.withWriter {
+		// Если нужен gzip, то добавляем упаковку
+		if stdhttp.UseGzip(br.proc.R, math.MaxInt, &br.proc.ExtraHeaders) {
+			br.writer = gzip.NewWriter(br)
+			br.withGzip = true
+		}
 	}
 
 	rows := br.proc.DBqueryRows
@@ -156,65 +160,65 @@ func (br *ByRow) Do() (err error) {
 			}
 		}
 
-		if len(br.Data) == 0 {
-			// Писать нечего
-			continue
-		}
-
-		for i, rd := range br.Data {
-			if i > 0 || br.RowNum > 0 {
-				// Пишем разделитель
-				if rd.Separator != nil {
-					_, err = br.writer.Write(rd.Separator)
+		if br.withWriter && len(br.Data) != 0 {
+			for i, rd := range br.Data {
+				if i > 0 || br.RowNum > 0 {
+					// Пишем разделитель
+					if rd.Separator != nil {
+						_, err = br.writer.Write(rd.Separator)
+						if err != nil {
+							return
+						}
+					}
+				} else if br.Begin != nil {
+					// Пишем начало результата
+					_, err = br.writer.Write(br.Begin)
 					if err != nil {
 						return
 					}
 				}
-			} else if br.Begin != nil {
-				// Пишем начало результата
-				_, err = br.writer.Write(br.Begin)
-				if err != nil {
-					return
-				}
-			}
 
-			if rd.Prefix != nil {
-				// Пишем префикс
-				_, err = br.writer.Write(rd.Prefix)
-				if err != nil {
-					return
-				}
-			}
-
-			if !misc.IsNil(rd.Data) {
-				// Маршалим данные в json
-				var j []byte
-				j, err = jsonw.Marshal(rd.Data)
-				if err != nil {
-					return
+				if rd.Prefix != nil {
+					// Пишем префикс
+					_, err = br.writer.Write(rd.Prefix)
+					if err != nil {
+						return
+					}
 				}
 
-				// Пишем данные
-				_, err = br.writer.Write(j)
-				if err != nil {
-					return
-				}
-			}
+				if !misc.IsNil(rd.Data) {
+					// Маршалим данные в json
+					var j []byte
+					j, err = jsonw.Marshal(rd.Data)
+					if err != nil {
+						return
+					}
 
-			if rd.Suffix != nil {
-				// Пишем суффикс
-				_, err = br.writer.Write(rd.Suffix)
-				if err != nil {
-					return
+					// Пишем данные
+					_, err = br.writer.Write(j)
+					if err != nil {
+						return
+					}
+				}
+
+				if rd.Suffix != nil {
+					// Пишем суффикс
+					_, err = br.writer.Write(rd.Suffix)
+					if err != nil {
+						return
+					}
 				}
 			}
 		}
 
 		br.Data = nil
-		br.RowNum++
+
+		if !br.IsFinal {
+			br.RowNum++
+		}
 	}
 
-	if br.RowNum != 0 && br.End != nil {
+	if br.withWriter && br.RowNum != 0 && br.End != nil {
 		// Пишем конец результата
 		_, err = br.writer.Write(br.End)
 		if err != nil {
@@ -268,6 +272,10 @@ func (br *ByRow) Write(p []byte) (n int, err error) {
 //----------------------------------------------------------------------------------------------------------------------------//
 
 func (br *ByRow) Close() (err error) {
+	if !br.withWriter {
+		return
+	}
+
 	msgs := misc.NewMessages()
 	defer msgs.Free()
 
@@ -283,8 +291,6 @@ func (br *ByRow) Close() (err error) {
 		if err != nil {
 			msgs.AddError(err)
 		}
-	} else if !br.failed {
-		br.proc.W.WriteHeader(http.StatusNoContent)
 	}
 
 	err = msgs.Error()
