@@ -160,7 +160,12 @@ func (br *ByRow) Do() (err error) {
 			}
 		}
 
-		if br.withWriter && len(br.Data) != 0 {
+		if br.withWriter {
+			if len(br.Data) == 0 {
+				// Писать нечего
+				continue
+			}
+
 			for i, rd := range br.Data {
 				if i > 0 || br.RowNum > 0 {
 					// Пишем разделитель
@@ -213,7 +218,7 @@ func (br *ByRow) Do() (err error) {
 
 		br.Data = nil
 
-		if !br.IsFinal {
+		if !br.IsFinal || br.withWriter {
 			br.RowNum++
 		}
 	}
@@ -291,6 +296,8 @@ func (br *ByRow) Close() (err error) {
 		if err != nil {
 			msgs.AddError(err)
 		}
+	} else if !br.failed {
+		br.proc.W.WriteHeader(http.StatusNoContent)
 	}
 
 	err = msgs.Error()
