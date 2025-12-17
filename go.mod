@@ -1,6 +1,6 @@
 module github.com/alrusov/rest/v4
 
-go 1.25.4
+go 1.25.5
 
 require (
 	github.com/alrusov/auth v0.1.11
@@ -11,7 +11,7 @@ require (
 	github.com/alrusov/log v0.1.39
 	github.com/alrusov/misc v1.1.28
 	github.com/alrusov/shaping v0.1.0
-	github.com/alrusov/stdhttp v0.1.128
+	github.com/alrusov/stdhttp v0.1.129
 	github.com/getkin/kin-openapi v0.133.0
 	github.com/jmoiron/sqlx v1.4.0
 )

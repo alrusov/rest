@@ -31,21 +31,22 @@ type (
 		// Получение информации о методе
 		Info() *Info
 
-		// Вызывается перед обращением к базе, используется, например, для добавления дополнительных параметров или проверок
+		// Обработчики
 		// Если возвращает code != 0 или result != nil, то они и будут результатом
 		// Если code<0, то result содержит готовый ответ в []byte, отсылаем как есть с кодом -code
+
+		// Вызывается в самом начале обработки rest, используется, например, первичной настройки или проверок
+		Prepare(proc *ProcOptions) (result any, code int, err error)
+
+		// Вызывается перед обращением к базе, используется, например, для добавления дополнительных параметров или проверок
 		Before(proc *ProcOptions) (result any, code int, err error)
 
 		// Вызывается после обращения к базе, используется, например, для обогащения результата
-		// Если возвращает code != 0 или result != nil, то они и будут результатом
-		// Если code<0, то result содержит готовый ответ в []byte, отсылаем как есть с кодом -code
 		After(proc *ProcOptions) (result any, code int, err error)
 	}
 
 	FuncInit        func(info *Info) (err error)
-	FuncPrepare     func(proc *ProcOptions) (result any, code int, err error)
-	FuncBefore      func(proc *ProcOptions) (result any, code int, err error)
-	FuncAfter       func(proc *ProcOptions) (result any, code int, err error)
+	FuncHandler     func(proc *ProcOptions) (result any, code int, err error)
 	FuncResultTuner func(proc *ProcOptions, result0 any, code0 int, err0 error) (result any, code int, err error)
 
 	// Информация о методе
@@ -62,9 +63,9 @@ type (
 		WithTransactions bool            // Разрешить транзакции
 		QueryPrefix      string          // Префикс имени запроса в базу
 		Init             FuncInit        // User defined Init
-		Prepare          FuncPrepare     // User defined Prepare function
-		Before           FuncBefore      // User defined Before function
-		After            FuncAfter       // User defined After function
+		Prepare          FuncHandler     // User defined Prepare function
+		Before           FuncHandler     // User defined Before function
+		After            FuncHandler     // User defined After function
 		shaping          *shaping.S      // Shaper
 		ResultTuner      FuncResultTuner // The last step result tuner
 	}

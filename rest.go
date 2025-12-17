@@ -723,6 +723,21 @@ func (proc *ProcOptions) prepare() (result any, code int, err error) {
 		}
 	}
 
+	if misc.IsNil(proc.handler.Prepare) {
+		return
+	}
+
+	result, code, err = proc.handler.Prepare(proc)
+	if err != nil {
+		if code == 0 {
+			code = http.StatusUnprocessableEntity
+		}
+		return
+	}
+	if code != 0 || !misc.IsNil(result) {
+		return
+	}
+
 	return
 }
 
@@ -740,6 +755,10 @@ func (proc *ProcOptions) before() (result any, code int, err error) {
 		if code != 0 || !misc.IsNil(result) {
 			return
 		}
+	}
+
+	if misc.IsNil(proc.handler.Before) {
+		return
 	}
 
 	result, code, err = proc.handler.Before(proc)
@@ -767,6 +786,10 @@ func (proc *ProcOptions) after() (result any, code int, err error) {
 		return
 	}
 	if code != 0 || !misc.IsNil(result) {
+		return
+	}
+
+	if misc.IsNil(proc.handler.After) {
 		return
 	}
 
