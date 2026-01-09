@@ -2,10 +2,12 @@ package path
 
 import (
 	"fmt"
+	"maps"
 	"net/http"
 	"reflect"
 	"regexp"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/alrusov/config"
@@ -110,6 +112,11 @@ type (
 		Pattern     any          `json:"pattern"`
 		Type        reflect.Type `json:"-"`
 	}
+
+	KnownObjects struct {
+		sync.RWMutex
+		Data map[string]*Object
+	}
 )
 
 const (
@@ -158,7 +165,7 @@ const (
 )
 
 var (
-	knownObjects = map[string]*Object{}
+	knownObjects = newKnownObjects()
 )
 
 //----------------------------------------------------------------------------------------------------------------------------//
@@ -227,6 +234,7 @@ func (chains *Chains) Prepare(m string) (err error) {
 
 	err = chains.StdParams.Prepare(m, msgs)
 	if err != nil {
+		msgs.AddError(err)
 		return
 	}
 
@@ -446,8 +454,17 @@ func (c *Chains) Swap(i, j int) {
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
+func newKnownObjects() *KnownObjects {
+	return &KnownObjects{
+		Data: make(map[string]*Object),
+	}
+}
+
 func GetKnownObjects() map[string]*Object {
-	return knownObjects
+	knownObjects.RLock()
+	defer knownObjects.RUnlock()
+
+	return maps.Clone(knownObjects.Data)
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//
@@ -457,14 +474,17 @@ func SaveObject(name string, obj reflect.Type, withArray bool, withCU bool) (err
 		return
 	}
 
-	r, exists := knownObjects[name]
+	knownObjects.Lock()
+	defer knownObjects.Unlock()
+
+	r, exists := knownObjects.Data[name]
 	if !exists {
 		r = &Object{
 			Type:   obj,
 			WithCU: withCU,
 		}
 
-		knownObjects[name] = r
+		knownObjects.Data[name] = r
 
 	} else {
 		if r.Type != obj {
@@ -489,6 +509,10 @@ func SaveObject(name string, obj reflect.Type, withArray bool, withCU bool) (err
 //----------------------------------------------------------------------------------------------------------------------------//
 
 func (set *Set) Clone() *Set {
+	if set == nil {
+		return nil
+	}
+
 	new := *set
 
 	new.Methods = make(Methods, len(set.Methods))
@@ -550,6 +574,10 @@ func (token *Token) Clone() *Token {
 //----------------------------------------------------------------------------------------------------------------------------//
 
 func StructType(v any) (t reflect.Type, err error) {
+	if v == nil {
+		return nil, fmt.Errorf("nil value")
+	}
+
 	t = reflect.TypeOf(v)
 	if t.Kind() == reflect.Pointer {
 		t = t.Elem()

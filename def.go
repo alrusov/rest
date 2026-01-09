@@ -227,7 +227,9 @@ var (
 	httpHdl *stdhttp.HTTP
 	base    string
 	defDB   string
-	configs misc.InterfaceMap
+
+	configsMutex sync.RWMutex
+	configs      misc.InterfaceMap
 
 	modulesMutex sync.RWMutex
 	modules      = map[string]*Module{} // Обработчики API

@@ -68,6 +68,7 @@ func (proc *ProcOptions) do() (result any, code int, err error) {
 			res, _ := result.(*ExecResult)
 			if res != nil {
 				success = res.FailedRows == 0
+				// будет rollback, насколько это хорошо?
 			}
 		}
 
@@ -295,7 +296,7 @@ func (proc *ProcOptions) save(forUpdate bool, addBlank bool) (result any, code i
 
 	err = proc.prepareFields(proc.InternalExecResult, addBlank)
 	if err != nil {
-		code = http.StatusBadRequest
+		code = http.StatusUnprocessableEntity
 		return
 	}
 
@@ -778,6 +779,10 @@ func (proc *ProcOptions) before() (result any, code int, err error) {
 //----------------------------------------------------------------------------------------------------------------------------//
 
 func (proc *ProcOptions) after() (result any, code int, err error) {
+	if misc.IsNil(proc.handler.After) {
+		return
+	}
+
 	result, code, err = proc.handler.After(proc)
 	if err != nil {
 		if code == 0 {
@@ -786,10 +791,6 @@ func (proc *ProcOptions) after() (result any, code int, err error) {
 		return
 	}
 	if code != 0 || !misc.IsNil(result) {
-		return
-	}
-
-	if misc.IsNil(proc.handler.After) {
 		return
 	}
 
@@ -928,7 +929,7 @@ func (proc *ProcOptions) finishTransaction(success bool) (err error) {
 	if success {
 		err = proc.dbTx.Commit()
 	} else {
-		err = proc.dbTx.Rollback()
+		_ = proc.dbTx.Rollback() // и так уже была ошибка, поэтому уже все равно
 	}
 
 	return

@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/alrusov/config"
@@ -73,7 +74,8 @@ const (
 )
 
 var (
-	extraSecuritySchemes = oa.SecuritySchemes{}
+	extraSecuritySchemesMutex sync.Mutex
+	extraSecuritySchemes      = oa.SecuritySchemes{}
 
 	commonCodes = []int{
 		http.StatusUnauthorized,
@@ -124,6 +126,8 @@ func (x *Config) Check(cfg any) (err error) {
 //----------------------------------------------------------------------------------------------------------------------------//
 
 func AddSecurityScheme(name string, sr *oa.SecuritySchemeRef) {
+	extraSecuritySchemesMutex.Lock()
+	defer extraSecuritySchemesMutex.Unlock()
 	extraSecuritySchemes[name] = sr
 }
 
@@ -231,18 +235,18 @@ func (proc *processor) prepare() (err error) {
 
 	securitySchemes := oa.SecuritySchemes{}
 
-	if m, exists := proc.httpCfg.Auth.Methods["jwt"]; exists {
+	if m, exists := proc.httpCfg.Auth.Methods[config.AuthMethodJWT]; exists {
 		if m.Enabled {
-			name := "jwt"
+			name := config.AuthMethodJWT
 			securitySchemes[name] = &oa.SecuritySchemeRef{
 				Value: oa.NewJWTSecurityScheme(),
 			}
 		}
 	}
 
-	if m, exists := proc.httpCfg.Auth.Methods["basic"]; exists {
+	if m, exists := proc.httpCfg.Auth.Methods[config.AuthMethodBasic]; exists {
 		if m.Enabled {
-			name := "basic"
+			name := config.AuthMethodBasic
 			securitySchemes[name] = &oa.SecuritySchemeRef{
 				Value: &oa.SecurityScheme{
 					Type:   "http",
@@ -355,15 +359,22 @@ func (proc *processor) addComponents() (err error) {
 }
 
 func (proc *processor) addComponentSchemas() (err error) {
-	schemas := make(oa.Schemas)
+	knownOblects := path.GetKnownObjects()
+	if knownOblects == nil {
+		return
+	}
 
-	list := path.GetKnownObjects()
-	for name, t := range list {
+	schemas := make(oa.Schemas, len(knownOblects)*2) // Обычно 2 схемы на объект (основная + CU)
+	defer func() {
+		proc.result.Components.Schemas = schemas
+	}()
+
+	for name, t := range knownOblects {
 		if name == path.VarIgnore {
 			continue
 		}
 
-		makeSchema := func(withoutReadOnly bool, suffix string) {
+		makeSchema := func(withoutReadOnly bool, suffix string) (err error) {
 			name := name + suffix
 
 			var objSchema *oa.Schema
@@ -388,16 +399,21 @@ func (proc *processor) addComponentSchemas() (err error) {
 				}
 				proc.schemas[name] = objSchema
 			}
+
+			return
 		}
 
-		makeSchema(false, "")
+		if err = makeSchema(false, ""); err != nil {
+			return
+		}
 
 		if t.WithCU {
-			makeSchema(true, "CU")
+			if err = makeSchema(true, "CU"); err != nil {
+				return
+			}
 		}
 	}
 
-	proc.result.Components.Schemas = schemas
 	return
 }
 
@@ -486,7 +502,7 @@ func (proc *processor) scanChains(chains *path.Set, urlPath string, info *rest.I
 
 			// Response headers
 
-			var responseHeaders map[string]*oa.HeaderRef
+			responseHeaders := make(map[string]*oa.HeaderRef)
 			if len(chain.Params.OutHeaders) > 0 {
 				responseHeaders = make(map[string]*oa.HeaderRef, 16)
 			}
@@ -503,7 +519,7 @@ func (proc *processor) scanChains(chains *path.Set, urlPath string, info *rest.I
 
 			if chain.Params.Request.Name != "" {
 				name := chain.Params.Request.Name
-				if chain.Params.Flags|path.FlagWithoutCU == 0 {
+				if chain.Params.Flags&path.FlagWithoutCU == 0 {
 					name += "CU" // CU == (create + update) without readonly fields
 				}
 

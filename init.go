@@ -22,7 +22,9 @@ func Init(cfg any, hh *stdhttp.HTTP, basePath string, defaultDB string, extraCon
 	httpHdl = hh
 	base = basePath
 	defDB = defaultDB
+	configsMutex.Lock()
 	configs = extraConfigs
+	configsMutex.Unlock()
 
 	path.SaveObject(ErrorResultName, reflect.TypeOf(stdhttp.ErrorResponse{}), false, false)
 	path.SaveObject(ExecResultName, reflect.TypeOf(ExecResult{}), false, false)
@@ -35,6 +37,9 @@ func Init(cfg any, hh *stdhttp.HTTP, basePath string, defaultDB string, extraCon
 //----------------------------------------------------------------------------------------------------------------------------//
 
 func ModuleRegistration(handler API) (err error) {
+	modulesMutex.Lock()
+	defer modulesMutex.Unlock()
+
 	info := handler.Info()
 	if info == nil {
 		return fmt.Errorf(`info is nil for [%#v]"`, handler)
@@ -43,7 +48,6 @@ func ModuleRegistration(handler API) (err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("[%s] %s", info.Path, err)
-			return
 		}
 	}()
 
@@ -66,6 +70,10 @@ func ModuleRegistration(handler API) (err error) {
 		url = fmt.Sprintf("%s/%s", base, info.Path)
 	}
 	url = misc.NormalizeSlashes(url)
+
+	if _, exists := modules[url]; exists {
+		return fmt.Errorf(`%s already registered"`, url)
+	}
 
 	if len(info.Tags) == 0 {
 		ss := strings.Split(url, "/")
@@ -120,9 +128,7 @@ func ModuleRegistration(handler API) (err error) {
 		LogFacility: log.NewFacility(url),
 	}
 
-	modulesMutex.Lock()
 	modules[url] = p
-	modulesMutex.Unlock()
 
 	httpHdl.AddEndpointsInfo(
 		misc.StringMap{
@@ -162,10 +168,12 @@ func RemoveModuleRegistration(handler API) (err error) {
 //----------------------------------------------------------------------------------------------------------------------------//
 
 func loadEndpointConfig(relURL string, info *Info) (err error) {
+	configsMutex.RLock()
 	urlCfg, exists := configs[relURL]
+	configsMutex.RUnlock()
 	if !exists {
 		urlCfg = map[string]any{}
-	} else if reflect.ValueOf(urlCfg).Type() != reflect.ValueOf(map[string]any{}).Type() {
+	} else if !isRawConfig(urlCfg) {
 		// already loaded before
 		return
 	}
@@ -191,7 +199,9 @@ func loadEndpointConfig(relURL string, info *Info) (err error) {
 		return fmt.Errorf("%s", err)
 	}
 
+	configsMutex.Lock()
 	configs[relURL] = urlCfg
+	configsMutex.Unlock()
 
 	m := v.MethodByName("Check")
 
@@ -234,17 +244,37 @@ func lookingForUnusedConfigs() (err error) {
 	defer msgs.Free()
 
 	if !misc.TEST {
-		notProcessedTp := reflect.ValueOf(map[string]any{}).Type()
-
+		configsMutex.RLock()
 		for name, c := range configs {
-			v := reflect.ValueOf(c)
-			if notProcessedTp == v.Type() {
-				msgs.Add(`api.configs contains data for unknown endpoint "%s" (%v)`, name, v)
+			if isRawConfig(c) {
+				msgs.Add(`api.configs contains data for unknown endpoint "%s" (%v)`, name, c)
 			}
 		}
+		configsMutex.RUnlock()
 	}
 
 	return msgs.Error()
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func isRawConfig(v any) bool {
+	if v == nil {
+		return false
+	}
+
+	rt := reflect.TypeOf(v)
+	if rt.Kind() != reflect.Map {
+		return false
+	}
+
+	// Проверяем, что это map[string]any
+	if rt.Key().Kind() != reflect.String {
+		return false
+	}
+
+	// Значение может быть любым типом (any)
+	return rt.Elem().Kind() == reflect.Interface
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//

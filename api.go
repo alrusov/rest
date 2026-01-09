@@ -6,6 +6,7 @@ package rest
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -84,46 +85,17 @@ func HandlerEx(find FindModule, extra any, h *stdhttp.HTTP, id uint64, prefix st
 	proc.Scope = proc.Chain.Scope
 
 	if proc.ChainLocal.Params.Flags&path.FlagDontReadBody == 0 {
-		bodyBuf := new(bytes.Buffer)
-		_, err = bodyBuf.ReadFrom(r.Body)
+		code, err = proc.readBody()
 		if err != nil {
 			proc.reply(nil, code, err)
 			return
-		}
-
-		r.Body = nil
-		proc.RawBody = bodyBuf.Bytes()
-
-		// Парсим тело
-		requestObject := proc.ChainLocal.Params.Request
-
-		if len(proc.RawBody) != 0 && requestObject.Pattern != nil {
-			proc.RawBody = bytes.TrimSpace(proc.RawBody)
-			proc.RequestParams = reflect.New(
-				reflect.SliceOf(requestObject.Type),
-			).Interface()
-
-			switch requestObject.ContentType {
-			case stdhttp.ContentTypeJSON:
-				if len(proc.RawBody) > 0 && proc.RawBody[0] != '[' {
-					proc.RawBody = bytes.Join([][]byte{{'['}, proc.RawBody, {']'}}, []byte{})
-				}
-
-				err = jsonw.Unmarshal(proc.RawBody, &proc.RequestParams)
-				if err != nil {
-					code = http.StatusBadRequest
-					proc.reply(result, code, err)
-					Log.Message(log.ERR, "%s\n%v\n%s", err, proc.R.Header, proc.RawBody)
-					return
-				}
-			}
 		}
 	}
 
 	// Парсим query параметры
 	err = proc.parseQueryParams(r.URL.Query())
 	if err != nil {
-		code = http.StatusBadRequest
+		code = http.StatusUnprocessableEntity
 		proc.reply(result, code, err)
 		return
 	}
@@ -140,6 +112,52 @@ func HandlerEx(find FindModule, extra any, h *stdhttp.HTTP, id uint64, prefix st
 	}
 
 	proc.reply(result, code, err)
+	return
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func (proc *ProcOptions) readBody() (code int, err error) {
+	if proc.R == nil {
+		code = http.StatusInternalServerError
+		err = fmt.Errorf("request is nil")
+		return
+	}
+
+	bodyBuf := new(bytes.Buffer)
+	_, err = bodyBuf.ReadFrom(proc.R.Body)
+	if err != nil {
+		code = http.StatusInternalServerError
+		return
+	}
+
+	proc.RawBody = bodyBuf.Bytes()
+	proc.R.Body = io.NopCloser(bytes.NewReader(proc.RawBody))
+
+	// Парсим тело
+	requestObject := proc.ChainLocal.Params.Request
+
+	if len(proc.RawBody) != 0 && requestObject.Pattern != nil {
+		proc.RawBody = bytes.TrimSpace(proc.RawBody)
+		proc.RequestParams = reflect.New(
+			reflect.SliceOf(requestObject.Type),
+		).Interface()
+
+		switch requestObject.ContentType {
+		case stdhttp.ContentTypeJSON:
+			if len(proc.RawBody) > 0 && proc.RawBody[0] != '[' {
+				proc.RawBody = bytes.Join([][]byte{{'['}, proc.RawBody, {']'}}, []byte{})
+			}
+
+			err = jsonw.Unmarshal(proc.RawBody, &proc.RequestParams)
+			if err != nil {
+				code = http.StatusUnprocessableEntity
+				Log.Message(log.ERR, "%s\n%v\n%s", err, proc.R.Header, proc.RawBody)
+				return
+			}
+		}
+	}
+
 	return
 }
 
@@ -278,7 +296,7 @@ func (proc *ProcOptions) reply(result any, code int, err error) {
 				var ok bool
 				data, ok = result.([]byte)
 				if !ok {
-					msg := fmt.Sprintf("resilt is %T, expected %T", result, data)
+					msg := fmt.Sprintf("result is %T, expected %T", result, data)
 					stdhttp.Error(proc.ID, false, proc.W, proc.R, code, msg, nil)
 					return
 				}
@@ -305,9 +323,9 @@ func (proc *ProcOptions) reply(result any, code int, err error) {
 
 	proc.LogFacility.Message(log.TRACE3, `[%d] WriteReply: %d (%s)`, proc.ID, code, contentType)
 
-	stdhttp.WriteReply(proc.W, proc.R, code, contentType, proc.ExtraHeaders, data)
+	err = stdhttp.WriteReply(proc.W, proc.R, code, contentType, proc.ExtraHeaders, data)
 	if err != nil {
-		proc.LogFacility.Message(log.NOTICE, "[%d] WriteReply error: %s", proc.ID, err)
+		proc.LogFacility.Message(log.NOTICE, "[%d] WriteReply error (client may have disconnected): %s", proc.ID, err)
 	}
 }
 
@@ -473,7 +491,7 @@ func convert(s string, field reflect.Value) (err error) {
 		var x uint64
 		x, err = strconv.ParseUint(s, 10, 64)
 		if err != nil {
-			return fmt.Errorf(`convertion error from "%s" to uint (%s)`, s, err)
+			return fmt.Errorf(`conversion error from "%s" to uint (%s)`, s, err)
 		}
 		field.SetUint(x)
 		return
@@ -482,7 +500,7 @@ func convert(s string, field reflect.Value) (err error) {
 		var x float64
 		x, err = strconv.ParseFloat(s, 64)
 		if err != nil {
-			return fmt.Errorf(`convertion error from "%s" to float (%s)`, s, err)
+			return fmt.Errorf(`conversion error from "%s" to float (%s)`, s, err)
 		}
 		field.SetFloat(x)
 		return
@@ -493,7 +511,7 @@ func convert(s string, field reflect.Value) (err error) {
 			var x time.Time
 			x, err = ParseTime(s)
 			if err != nil {
-				return fmt.Errorf(`convertion error from "%s" to time (%s)`, s, err)
+				return fmt.Errorf(`conversion error from "%s" to time (%s)`, s, err)
 			}
 			field.Set(reflect.ValueOf(x.UTC()))
 			return
