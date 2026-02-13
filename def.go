@@ -221,7 +221,7 @@ const (
 //----------------------------------------------------------------------------------------------------------------------------//
 
 var (
-	Log = log.NewFacility("api") // Log facility
+	Log = log.NewFacility("rest") // Log facility
 
 	appCfg  any
 	httpHdl *stdhttp.HTTP
