@@ -577,3 +577,51 @@ func (proc *ProcOptions) free() {
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//
+
+func (proc *ProcOptions) SetLocale(locale string) {
+	locale, _ = misc.NormalizeLocale(locale)
+	proc.Locale = locale
+	proc.SetCookie(CookieLocale, locale, false)
+}
+
+func (proc *ProcOptions) GetLocale() (locale string, lang string) {
+	locale = proc.Locale
+	if locale == "" {
+		locale = proc.GetCookie(CookieLocale)
+	}
+
+	return misc.NormalizeLocale(locale)
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func (proc *ProcOptions) SetCookie(name string, val string, httpsOnly bool) {
+	if proc == nil {
+		return
+	}
+
+	cookie := &http.Cookie{
+		Name:     name,
+		Path:     "/",
+		Value:    val,
+		MaxAge:   999999999, // lifetime in seconds
+		HttpOnly: true,      // XSS protection
+		Secure:   httpsOnly, // HTTPS only
+	}
+
+	http.SetCookie(proc.W, cookie)
+}
+
+func (proc *ProcOptions) GetCookie(name string) (val string) {
+	if proc == nil || proc.R == nil {
+		return
+	}
+
+	if cookie, e := proc.R.Cookie(name); e == nil {
+		val = cookie.Value
+	}
+
+	return
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//

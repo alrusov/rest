@@ -104,6 +104,7 @@ type (
 		ExcludedFields     misc.StringMap      // Поля ([name]db_name), которые надо исключить из запроса
 		InternalExecResult *ExecResult         // Внутренний промежуточный результат выполнения
 		ExecResult         *ExecResult         // Результат выполнения Exec
+		Locale             string              // Locale
 		ExtraHeaders       misc.StringMap      // Дополнительные возвращаемые HTTP заголовки
 		Extra              any                 // Произвольные данные от вызывающего
 		Custom             any                 // Произвольные пользовательские данные
@@ -216,6 +217,8 @@ const (
 	StatusRetry     = 998 // Специальный http status, возвращаемый из After для повторного выполнения GET запроса (с возможно измененными там параметрами)
 
 	DBtypeNone = "-"
+
+	CookieLocale = "locale"
 )
 
 //----------------------------------------------------------------------------------------------------------------------------//
