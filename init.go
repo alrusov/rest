@@ -47,7 +47,7 @@ func ModuleRegistration(handler API) (err error) {
 
 	defer func() {
 		if err != nil {
-			err = fmt.Errorf("[%s] %s", info.Path, err)
+			err = fmt.Errorf("[%s] %w", info.Path, err)
 		}
 	}()
 
@@ -196,7 +196,7 @@ func loadEndpointConfig(relURL string, info *Info) (err error) {
 
 	err = config.ConvExtra(&urlCfg, info.Config)
 	if err != nil {
-		return fmt.Errorf("%s", err)
+		return fmt.Errorf("%w", err)
 	}
 
 	configsMutex.Lock()
@@ -220,7 +220,7 @@ func loadEndpointConfig(relURL string, info *Info) (err error) {
 	}
 
 	if err != nil {
-		return fmt.Errorf(`config.Check: %s`, err)
+		return fmt.Errorf(`config.Check: %w`, err)
 	}
 
 	return

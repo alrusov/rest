@@ -984,7 +984,7 @@ func (execResult *ExecResult) DbResultParser(dbExecResult *db.Result, returnsObj
 		var n int64
 		n, err = dbExecResult.RowsAffected()
 		if err != nil {
-			err = fmt.Errorf("RowsAffected: %s", err)
+			err = fmt.Errorf("RowsAffected: %w", err)
 			return
 		}
 

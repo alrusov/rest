@@ -491,7 +491,7 @@ func convert(s string, field reflect.Value) (err error) {
 		var x uint64
 		x, err = strconv.ParseUint(s, 10, 64)
 		if err != nil {
-			return fmt.Errorf(`conversion error from "%s" to uint (%s)`, s, err)
+			return fmt.Errorf(`conversion error from "%s" to uint (%w)`, s, err)
 		}
 		field.SetUint(x)
 		return
@@ -500,7 +500,7 @@ func convert(s string, field reflect.Value) (err error) {
 		var x float64
 		x, err = strconv.ParseFloat(s, 64)
 		if err != nil {
-			return fmt.Errorf(`conversion error from "%s" to float (%s)`, s, err)
+			return fmt.Errorf(`conversion error from "%s" to float (%w)`, s, err)
 		}
 		field.SetFloat(x)
 		return
@@ -511,7 +511,7 @@ func convert(s string, field reflect.Value) (err error) {
 			var x time.Time
 			x, err = ParseTime(s)
 			if err != nil {
-				return fmt.Errorf(`conversion error from "%s" to time (%s)`, s, err)
+				return fmt.Errorf(`conversion error from "%s" to time (%w)`, s, err)
 			}
 			field.Set(reflect.ValueOf(x.UTC()))
 			return

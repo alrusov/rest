@@ -860,7 +860,7 @@ func (p *Params) ExtractFieldsFromBody(body []byte) (fieldsSlice []misc.Interfac
 	var data []map[string]any
 	err = jsonw.Unmarshal(body, &data) // Все структуры, включая вложенные, получатся как map[string]any
 	if err != nil {
-		err = fmt.Errorf("unmarshal: %s", err)
+		err = fmt.Errorf("unmarshal: %w", err)
 		return
 	}
 

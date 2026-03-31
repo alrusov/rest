@@ -5,11 +5,11 @@ go 1.26.1
 require (
 	github.com/alrusov/auth v0.1.11
 	github.com/alrusov/cache v0.1.4
-	github.com/alrusov/config v0.1.68
-	github.com/alrusov/db v0.1.59
+	github.com/alrusov/config v0.1.69
+	github.com/alrusov/db v0.1.60
 	github.com/alrusov/jsonw v0.1.3
 	github.com/alrusov/log v0.1.40
-	github.com/alrusov/misc v1.1.33
+	github.com/alrusov/misc v1.1.34
 	github.com/alrusov/shaping v0.1.3
 	github.com/alrusov/stdhttp v0.1.130
 	github.com/getkin/kin-openapi v0.134.0

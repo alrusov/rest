@@ -179,7 +179,7 @@ func Compose(logFacility *log.Facility, cfg *Config, httpCfg *config.Listener, p
 
 			err = proc.scanChains(info.Methods, urlPath, info)
 			if err != nil {
-				err = fmt.Errorf("%s: %s", urlPath, err)
+				err = fmt.Errorf("%s: %w", urlPath, err)
 				return
 			}
 
