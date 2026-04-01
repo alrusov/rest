@@ -57,6 +57,7 @@ func HandlerEx(find FindModule, extra any, h *stdhttp.HTTP, id uint64, prefix st
 	proc.W = w
 	proc.Extra = extra
 	proc.ExtraHeaders = make(misc.StringMap, 8)
+	proc.GetLocale()
 
 	var err error
 	var result any
@@ -590,7 +591,9 @@ func (proc *ProcOptions) GetLocale() (locale string, lang string) {
 		locale = proc.GetCookie(CookieLocale)
 	}
 
-	return misc.NormalizeLocale(locale)
+	locale, lang = misc.NormalizeLocale(locale)
+	proc.Locale = locale
+	return
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//
