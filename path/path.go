@@ -128,6 +128,7 @@ const (
 	FlagUDqueriesReturnsID       = Flags(0x00000008)
 	FlagWithoutCU                = Flags(0x00000010)
 	FlagDontReadBody             = Flags(0x00000020)
+	FlagPutNotPatch              = Flags(0x00000040)
 
 	FlagChainDefault    = Flags(0x00000001)
 	FlagChainEnableTail = Flags(0x00000002)
@@ -174,10 +175,12 @@ func (set *Set) Prepare() (err error) {
 	msgs := misc.NewMessages()
 	defer msgs.Free()
 
-	if set.Methods[stdhttp.MethodPUT] == nil && set.Methods[stdhttp.MethodPATCH] != nil {
-		set.Methods[stdhttp.MethodPUT] = set.Methods[stdhttp.MethodPATCH].Clone()
-	} else if set.Methods[stdhttp.MethodPATCH] == nil && set.Methods[stdhttp.MethodPUT] != nil {
-		set.Methods[stdhttp.MethodPATCH] = set.Methods[stdhttp.MethodPUT].Clone()
+	if set.Flags&FlagPutNotPatch == 0 {
+		if set.Methods[stdhttp.MethodPUT] == nil && set.Methods[stdhttp.MethodPATCH] != nil {
+			set.Methods[stdhttp.MethodPUT] = set.Methods[stdhttp.MethodPATCH].Clone()
+		} else if set.Methods[stdhttp.MethodPATCH] == nil && set.Methods[stdhttp.MethodPUT] != nil {
+			set.Methods[stdhttp.MethodPATCH] = set.Methods[stdhttp.MethodPUT].Clone()
+		}
 	}
 
 	for m, c := range set.Methods {

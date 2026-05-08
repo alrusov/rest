@@ -12,7 +12,7 @@ require (
 	github.com/alrusov/misc v1.1.35
 	github.com/alrusov/shaping v0.1.3
 	github.com/alrusov/stdhttp v0.1.130
-	github.com/getkin/kin-openapi v0.135.0
+	github.com/getkin/kin-openapi v0.138.0
 	github.com/jmoiron/sqlx v1.4.0
 )
 
@@ -33,8 +33,9 @@ require (
 	github.com/naoina/go-stringutil v0.1.0 // indirect
 	github.com/naoina/toml v0.1.1 // indirect
 	github.com/oasdiff/yaml v0.0.9 // indirect
-	github.com/oasdiff/yaml3 v0.0.9 // indirect
+	github.com/oasdiff/yaml3 v0.0.12 // indirect
 	github.com/perimeterx/marshmallow v1.1.5 // indirect
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
 	github.com/woodsbury/decimal128 v1.3.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
