@@ -88,6 +88,8 @@ type (
 		Response ResponseParams `json:"responseParams"`
 
 		DBFields *db.FieldsList `json:"-"`
+
+		prepared bool
 	}
 
 	RequestParams struct {
@@ -235,12 +237,6 @@ func (chains *Chains) Prepare(m string) (err error) {
 		return
 	}
 
-	err = chains.StdParams.Prepare(m, msgs)
-	if err != nil {
-		msgs.AddError(err)
-		return
-	}
-
 	// Убираем nil цепочки
 
 	dstI := 0
@@ -268,8 +264,11 @@ func (chains *Chains) Prepare(m string) (err error) {
 	for ci, chain := range chains.Chains {
 		if reflect.DeepEqual(chain.Params, Params{}) {
 			chain.Params = chains.StdParams
-		} else {
-			chain.Params.Prepare(m, msgs)
+		}
+
+		e := chain.Params.Prepare(m, msgs)
+		if e != nil {
+			continue
 		}
 
 		chain.Parent = chains
@@ -307,10 +306,9 @@ func (chains *Chains) Prepare(m string) (err error) {
 				continue
 			}
 
-			var re *regexp.Regexp
-			re, err = regexp.Compile(`^(` + token.Expr + `)$`)
-			if err != nil {
-				msgs.Add("[%d.%d] %s", ci, ti, err)
+			re, e := regexp.Compile(`^(` + token.Expr + `)$`)
+			if e != nil {
+				msgs.Add("[%d.%d] %s", ci, ti, e)
 				continue
 			}
 			chain.Tokens[ti].re = re
@@ -597,6 +595,14 @@ func StructType(v any) (t reflect.Type, err error) {
 //----------------------------------------------------------------------------------------------------------------------------//
 
 func (p *Params) Prepare(m string, msgs *misc.Messages) (err error) {
+	if p.prepared {
+		return
+	}
+
+	defer func() {
+		p.prepared = true
+	}()
+
 	if p.PathParamsPattern == nil {
 		p.PathParamsPattern = struct{}{}
 	}
@@ -709,6 +715,7 @@ func (p *Params) Prepare(m string, msgs *misc.Messages) (err error) {
 			}
 		}
 	}
+
 	return
 }
 
