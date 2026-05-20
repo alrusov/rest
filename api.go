@@ -250,22 +250,22 @@ func (proc *ProcOptions) reply(result any, code int, err error) {
 		}
 
 	case http.StatusNotImplemented:
-		if err == nil {
+		if result == nil && err == nil {
 			code, err = NotImplemented("")
 		}
 
 	case http.StatusMethodNotAllowed:
-		if err == nil {
+		if result == nil && err == nil {
 			code, err = NotAllowed("")
 		}
 
 	case http.StatusNotFound:
-		if err == nil {
+		if result == nil && err == nil {
 			code, err = NotFound("")
 		}
 	}
 
-	if err != nil {
+	if result == nil && err != nil {
 		stdhttp.Error(proc.ID, false, proc.W, proc.R, code, err.Error(), nil)
 		return
 	}

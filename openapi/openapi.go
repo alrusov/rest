@@ -604,10 +604,25 @@ func (proc *processor) scanChains(chains *path.Set, urlPath string, info *rest.I
 			proc.knownID[oidBase] = ki
 
 			// Создаём операцию
+			makeDescription := func(ss []string) string {
+				for i, s := range ss {
+					ii := i
+					for s != "" && s[0] == '~' {
+						s = s[1:]
+						ss[i] = s
+						ii--
+						if ii >= 0 {
+							ss[ii] = ""
+						}
+					}
+				}
+
+				return strings.ReplaceAll(strings.Join(ss, " "), "  ", " ")
+			}
 
 			op := &oa.Operation{
-				Summary:     strings.TrimSpace(strings.Join([]string{info.Summary, chains.Summary, chain.Summary}, " ")),
-				Description: strings.TrimSpace(strings.Join([]string{info.Description, chains.Description, chain.Description}, " ")),
+				Summary:     strings.TrimSpace(makeDescription(([]string{info.Summary, chains.Summary, chain.Summary}))),
+				Description: strings.TrimSpace(makeDescription([]string{info.Description, chains.Description, chain.Description})),
 				OperationID: oid,
 			}
 
