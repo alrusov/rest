@@ -1,18 +1,18 @@
 module github.com/alrusov/rest/v4
 
-go 1.26.2
+go 1.26.3
 
 require (
 	github.com/alrusov/auth v0.1.11
 	github.com/alrusov/cache v0.1.5
 	github.com/alrusov/config v0.1.69
-	github.com/alrusov/db v0.1.60
+	github.com/alrusov/db v0.1.61
 	github.com/alrusov/jsonw v0.1.3
 	github.com/alrusov/log v0.1.40
 	github.com/alrusov/misc v1.1.35
 	github.com/alrusov/shaping v0.1.3
 	github.com/alrusov/stdhttp v0.1.130
-	github.com/getkin/kin-openapi v0.138.0
+	github.com/getkin/kin-openapi v0.139.0
 	github.com/jmoiron/sqlx v1.4.0
 )
 
@@ -32,8 +32,8 @@ require (
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
 	github.com/naoina/go-stringutil v0.1.0 // indirect
 	github.com/naoina/toml v0.1.1 // indirect
-	github.com/oasdiff/yaml v0.0.9 // indirect
-	github.com/oasdiff/yaml3 v0.0.12 // indirect
+	github.com/oasdiff/yaml v0.1.0 // indirect
+	github.com/oasdiff/yaml3 v0.0.13 // indirect
 	github.com/perimeterx/marshmallow v1.1.5 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
 	github.com/woodsbury/decimal128 v1.3.0 // indirect

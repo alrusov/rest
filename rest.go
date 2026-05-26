@@ -114,7 +114,7 @@ type (
 // Get -- получить данные
 func (proc *ProcOptions) Get() (result any, code int, err error) {
 	if proc.ChainLocal.CacheLifetime > 0 {
-		ce, res, resCode := cache.Get(proc.ID, proc.Path, proc.R.RequestURI, proc.PathParams, proc.QueryParams)
+		ce, res, resCode := cache.Get(proc.ID, proc.Path, proc.R.Host, proc.R.RequestURI, proc.PathParams, proc.QueryParams)
 		if ce == nil {
 			cd, ok := res.(cachedData)
 			if !ok {
