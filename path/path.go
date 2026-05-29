@@ -30,6 +30,7 @@ type (
 	Methods map[string]*Chains
 
 	Chains struct {
+		Flags             Flags      `json:"flags,omitempty"`
 		Summary           string     `json:"summary"`
 		Description       string     `json:"description"`
 		ParamsDescription string     `json:"paramsDescription"`
@@ -134,6 +135,15 @@ const (
 
 	FlagChainDefault    = Flags(0x00000001)
 	FlagChainEnableTail = Flags(0x00000002)
+
+	FlagCustom1 = Flags(0x8000000000000000)
+	FlagCustom2 = Flags(0x4000000000000000)
+	FlagCustom3 = Flags(0x2000000000000000)
+	FlagCustom4 = Flags(0x1000000000000000)
+	FlagCustom5 = Flags(0x0800000000000000)
+	FlagCustom6 = Flags(0x0400000000000000)
+	FlagCustom7 = Flags(0x0200000000000000)
+	FlagCustom8 = Flags(0x0100000000000000)
 
 	// VarName
 	VarIgnore = "_"
