@@ -184,6 +184,10 @@ var (
 //----------------------------------------------------------------------------------------------------------------------------//
 
 func (set *Set) Prepare() (err error) {
+	if set == nil { // Модуль без методов
+		return
+	}
+
 	msgs := misc.NewMessages()
 	defer msgs.Free()
 
@@ -214,6 +218,11 @@ func (set *Set) Prepare() (err error) {
 //----------------------------------------------------------------------------------------------------------------------------//
 
 func (set *Set) Find(m string, path []string) (matched *Chain, pathParams any, result any, code int, err error) {
+	if set == nil { // Модуль без методов
+		code = http.StatusMethodNotAllowed
+		return
+	}
+
 	c, exists := set.Methods[m]
 	if !exists || len(c.Chains) == 0 {
 		code = http.StatusMethodNotAllowed

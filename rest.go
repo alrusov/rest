@@ -80,7 +80,16 @@ func (proc *ProcOptions) do() (result any, code int, err error) {
 
 // Успешно ли выполнение, т.е. надо ли делать commit
 func isTxSuccess(completed bool, result any, code int, err error) bool {
-	if !completed || err != nil || code/100 > 2 {
+	if !completed || err != nil {
+		return false
+	}
+
+	if code == StatusProcessed {
+		// Ответ отправил сам обработчик и ошибки не вернул -- считаем успехом. Для rollback он должен вернуть err
+		return true
+	}
+
+	if code/100 > 2 {
 		return false
 	}
 
@@ -539,12 +548,15 @@ func (proc *ProcOptions) checkFields(forUpdate bool, execResult *ExecResult) (su
 	for i, fields := range proc.Fields {
 		// check for required fields
 		for _, dbName := range proc.ChainLocal.Params.Request.RequiredFields {
+			reason := "is empty"
+
 			v, exists := fields[dbName]
 			switch {
 			case !exists:
 				if forUpdate {
 					continue
 				}
+				reason = "is not found"
 
 			case v == nil:
 				// null
@@ -556,7 +568,7 @@ func (proc *ProcOptions) checkFields(forUpdate bool, execResult *ExecResult) (su
 				}
 			}
 
-			execResult.Rows[i].AddMessage(`mandatory field "%s" is not found`, fieldName(dbName))
+			execResult.Rows[i].AddMessage(`mandatory field "%s" %s`, fieldName(dbName), reason)
 			success = false
 		}
 
@@ -586,7 +598,7 @@ func (proc *ProcOptions) checkFields(forUpdate bool, execResult *ExecResult) (su
 		}
 
 		// check for excluded fields
-		for _, dbName := range proc.ExcludedFields {
+		for dbName := range proc.ExcludedFields {
 			if _, exists := fields[dbName]; !exists {
 				continue
 			}
@@ -769,7 +781,7 @@ func (proc *ProcOptions) Others() (result any, code int, err error) {
 //----------------------------------------------------------------------------------------------------------------------------//
 
 func (info *Info) makeParamsDescription() (err error) {
-	if info.Description != "" {
+	if info.Description != "" || info.Methods == nil {
 		return
 	}
 
@@ -777,6 +789,11 @@ func (info *Info) makeParamsDescription() (err error) {
 		var d []string
 
 		t := chains.StdParams.QueryParamsType
+		if t == nil && chains.StdParams.QueryParamsPattern != nil {
+			// Сам StdParams не готовится (Prepare вызывается для его копий в цепочках), поэтому берем тип из шаблона
+			t = reflect.TypeOf(chains.StdParams.QueryParamsPattern)
+		}
+
 		if t != nil {
 			if t.Kind() == reflect.Pointer {
 				t = t.Elem()
@@ -1111,7 +1128,9 @@ func (execResult *ExecResult) DbResultParser(dbExecResult *db.Result, returnsObj
 			c = http.StatusNotFound
 		}
 		for _, r := range execResult.Rows {
-			r.Code = c
+			if r.Code == 0 { // не затираем код строк с ошибкой
+				r.Code = c
+			}
 		}
 	}
 

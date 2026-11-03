@@ -105,7 +105,7 @@ type (
 		DBqueryResult      any                 // Результат выполненения запроса (указатель на слайс) при ResultAsRows==false
 		DBqueryRows        *sqlx.Rows          // Результат при ResultAsRows==true
 		Fields             []misc.InterfaceMap // Поля (имя из sql запроса) для insert или update. Для select - список полей для выборки из базы, если нужны не все из объекта
-		ExcludedFields     misc.StringMap      // Поля ([name]db_name), которые надо исключить из запроса
+		ExcludedFields     misc.StringMap      // Поля, которые надо исключить из запроса: ключ -- db name, значение не используется (раньше там было json name)
 		InternalExecResult *ExecResult         // Внутренний промежуточный результат выполнения
 		ExecResult         *ExecResult         // Результат выполнения Exec
 		Locale             string              // Locale

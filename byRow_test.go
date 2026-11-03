@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -131,6 +132,37 @@ func TestByRowFailureBeforeFlush(t *testing.T) {
 				t.Errorf("got code %d, expected %d", w.Code, http.StatusInternalServerError)
 			}
 		})
+	}
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func TestByRowFailureAfterFlush(t *testing.T) {
+	proc, w := newByRowProc(t, false)
+
+	big := strings.Repeat("x", 2*blockBufferSize) // гарантированно вызовет Flush
+	tuner := func(br *ByRow, row any) (err error) {
+		if br.RowNum == 1 {
+			return fmt.Errorf("tuner error")
+		}
+
+		br.Data = []RowData{{Separator: ByRowDefaultSeparator, Data: big}}
+		return
+	}
+
+	br, err := NewByRow(proc, tuner, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = br.Do()
+	if err == nil {
+		t.Fatal("error expected")
+	}
+
+	// Данные уже ушли с кодом 200 -- изменить это нельзя, ошибка только логируется
+	if w.Code != http.StatusOK || w.Body.Len() == 0 {
+		t.Errorf("got code %d body len %d, expected 200 and partial data", w.Code, w.Body.Len())
 	}
 }
 

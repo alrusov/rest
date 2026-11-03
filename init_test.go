@@ -2,6 +2,7 @@ package rest
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -186,6 +187,30 @@ func TestModuleRegistrationNilConfigs(t *testing.T) {
 
 	if !isRegistered("/test/nilcfg") {
 		t.Error("module is not registered")
+	}
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func TestModuleRegistrationNilMethods(t *testing.T) {
+	useTestModules(t)
+
+	m := newTestModule("/test/nomethods", nil)
+	m.info.Methods = nil
+
+	err := ModuleRegistration(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	module, _, _, found := findModule("/test/nomethods")
+	if !found {
+		t.Fatal("module is not registered")
+	}
+
+	_, _, _, code, err := module.Info.Methods.Find(stdhttp.MethodGET, nil)
+	if code != http.StatusMethodNotAllowed || err != nil {
+		t.Errorf("got (%d, %v), expected (%d, nil)", code, err, http.StatusMethodNotAllowed)
 	}
 }
 

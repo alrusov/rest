@@ -9,6 +9,7 @@ import (
 	"reflect"
 
 	"github.com/alrusov/jsonw"
+	"github.com/alrusov/log"
 	"github.com/alrusov/misc"
 	"github.com/alrusov/stdhttp"
 )
@@ -93,6 +94,11 @@ func (br *ByRow) Do() (err error) {
 	defer func() {
 		if err != nil {
 			br.failed = true
+
+			if br.withWriter && br.blockNum > 0 {
+				// Код 200 и часть данных уже отправлены, сообщить клиенту об ошибке невозможно
+				Log.Message(log.ERR, "[%d] ByRow: the response is truncated after %d rows: %s", br.proc.ID, br.RowNum, err)
+			}
 		}
 
 		br.Close()
