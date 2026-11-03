@@ -381,7 +381,9 @@ func (chains *Chains) Find(path []string) (matched *Chain, pathParams any, code 
 
 		err = msgs.Error()
 		if err != nil {
+			// Путь подошел под шаблон, но значение не преобразуется (например, переполнение ID) -- такого объекта нет
 			matched = nil
+			code = http.StatusNotFound
 			return
 		}
 	}()

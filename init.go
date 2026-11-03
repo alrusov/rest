@@ -36,10 +36,8 @@ func Init(cfg any, hh *stdhttp.HTTP, basePath string, defaultDB string, extraCon
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
+// Блокировка modules берется только на время работы с ним, чтобы Init мог обращаться к модулям (Enumerate, регистрация и т.п.)
 func ModuleRegistration(handler API) (err error) {
-	modulesMutex.Lock()
-	defer modulesMutex.Unlock()
-
 	info := handler.Info()
 	if info == nil {
 		return fmt.Errorf(`info is nil for [%#v]"`, handler)
@@ -71,8 +69,8 @@ func ModuleRegistration(handler API) (err error) {
 	}
 	url = misc.NormalizeSlashes(url)
 
-	if _, exists := modules[url]; exists {
-		return fmt.Errorf(`%s already registered"`, url)
+	if isRegistered(url) {
+		return fmt.Errorf(`%s already registered`, url)
 	}
 
 	if len(info.Tags) == 0 {
@@ -86,13 +84,7 @@ func ModuleRegistration(handler API) (err error) {
 		}
 	}
 
-	for i, tag := range info.Tags {
-		tag = GetTagName(tag)
-		if tag != "" {
-			info.Tags[i] = tag
-			break
-		}
-	}
+	info.Tags = resolveTags(info.Tags)
 
 	err = loadEndpointConfig(relURL, info)
 	if err != nil {
@@ -128,14 +120,7 @@ func ModuleRegistration(handler API) (err error) {
 		LogFacility: log.NewFacility(url),
 	}
 
-	modules[url] = p
-
-	httpHdl.AddEndpointsInfo(
-		misc.StringMap{
-			url: info.Summary,
-		},
-	)
-
+	// Init до регистрации -- запросы к неинициализированному модулю не придут, а при ошибке он не останется зарегистрированным
 	if info.Init != nil {
 		err = info.Init(info)
 		if err != nil {
@@ -143,8 +128,38 @@ func ModuleRegistration(handler API) (err error) {
 		}
 	}
 
+	modulesMutex.Lock()
+	_, exists := modules[url]
+	if !exists {
+		modules[url] = p
+	}
+	modulesMutex.Unlock()
+
+	if exists {
+		// Зарегистрирован параллельно, пока мы готовились
+		return fmt.Errorf(`%s already registered`, url)
+	}
+
+	if httpHdl != nil {
+		httpHdl.AddEndpointsInfo(
+			misc.StringMap{
+				url: info.Summary,
+			},
+		)
+	}
+
 	p.LogFacility.Message(log.INFO, "Initialized")
 
+	return
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func isRegistered(url string) (exists bool) {
+	modulesMutex.RLock()
+	defer modulesMutex.RUnlock()
+
+	_, exists = modules[url]
 	return
 }
 
@@ -157,7 +172,9 @@ func RemoveModuleRegistration(handler API) (err error) {
 	for name, df := range modules {
 		if df.Handler == handler {
 			delete(modules, name)
-			httpHdl.DelEndpointsInfo(misc.StringMap{df.RawURL: ""})
+			if httpHdl != nil {
+				httpHdl.DelEndpointsInfo(misc.StringMap{df.RawURL: ""})
+			}
 			break
 		}
 	}
@@ -199,9 +216,15 @@ func loadEndpointConfig(relURL string, info *Info) (err error) {
 		return fmt.Errorf("%w", err)
 	}
 
-	configsMutex.Lock()
-	configs[relURL] = urlCfg
-	configsMutex.Unlock()
+	func() {
+		configsMutex.Lock()
+		defer configsMutex.Unlock()
+
+		if configs == nil { // Init вызван с extraConfigs == nil
+			configs = misc.InterfaceMap{}
+		}
+		configs[relURL] = urlCfg
+	}()
 
 	m := v.MethodByName("Check")
 

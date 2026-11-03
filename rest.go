@@ -12,6 +12,7 @@ import (
 
 	"github.com/alrusov/cache"
 	"github.com/alrusov/db"
+	"github.com/alrusov/log"
 	"github.com/alrusov/misc"
 	path "github.com/alrusov/rest/v4/path"
 	"github.com/alrusov/stdhttp"
@@ -62,25 +63,38 @@ func (proc *ProcOptions) do() (result any, code int, err error) {
 		return
 	}
 
-	defer func() {
-		success := err == nil && (code/100 <= 2)
-		if success {
-			res, _ := result.(*ExecResult)
-			if res != nil {
-				success = res.FailedRows == 0
-				// будет rollback, насколько это хорошо?
-			}
-		}
+	completed := false // false при выходе по панике
 
-		e := proc.finishTransaction(success)
+	defer func() {
+		e := proc.finishTransaction(isTxSuccess(completed, result, code, err))
 		if err == nil && e != nil {
 			err = e
 			result = nil
 		}
 	}()
 
-	// processing
+	result, code, err = proc.dispatch()
+	completed = true
+	return
+}
 
+// Успешно ли выполнение, т.е. надо ли делать commit
+func isTxSuccess(completed bool, result any, code int, err error) bool {
+	if !completed || err != nil || code/100 > 2 {
+		return false
+	}
+
+	res, _ := result.(*ExecResult)
+	if res != nil {
+		// будет rollback, насколько это хорошо?
+		return res.FailedRows == 0
+	}
+
+	return true
+}
+
+// Вызов обработчика метода
+func (proc *ProcOptions) dispatch() (result any, code int, err error) {
 	switch proc.R.Method {
 	default:
 		return proc.Others()
@@ -106,38 +120,92 @@ func (proc *ProcOptions) do() (result any, code int, err error) {
 
 type (
 	cachedData struct {
-		headers misc.StringMap
-		result  any
+		headers  misc.StringMap
+		result   any
+		uncached bool // Результат не подлежит кэшированию, получивший его должен выполнить запрос сам
 	}
+)
+
+var (
+	// Для подмены в тестах
+	cacheGet = cache.Get
+	queryTx  = (*db.DB).QueryTx
 )
 
 // Get -- получить данные
 func (proc *ProcOptions) Get() (result any, code int, err error) {
-	if proc.ChainLocal.CacheLifetime > 0 {
-		ce, res, resCode := cache.Get(proc.ID, proc.Path, proc.R.Host, proc.R.RequestURI, proc.PathParams, proc.QueryParams)
-		if ce == nil {
-			cd, ok := res.(cachedData)
-			if !ok {
-				code, err = InternalServerError("Illegal cached data: got %T, expected %T", res, cd)
-				return
-			}
+	if proc.ChainLocal.CacheLifetime <= 0 {
+		return proc.get()
+	}
 
-			result = cd.result
-			proc.ExtraHeaders = maps.Clone(cd.headers)
-			code = resCode
+	ce, res, resCode := cacheGet(proc.ID, proc.Path, proc.R.Host, proc.R.Host, proc.cacheUser(), proc.R.RequestURI, proc.PathParams, proc.QueryParams)
+	if ce == nil {
+		cd, ok := res.(cachedData)
+		if !ok {
+			code, err = InternalServerError("Illegal cached data: got %T, expected %T", res, cd)
 			return
 		}
 
-		defer func() {
-			cd := cachedData{
+		if cd.uncached {
+			// Предыдущее заполнение кэша неудачно, выполняем запрос без кэша
+			return proc.get()
+		}
+
+		result = cd.result
+		proc.ExtraHeaders = maps.Clone(cd.headers)
+		code = resCode
+		return
+	}
+
+	completed := false // false при выходе по панике
+
+	defer func() {
+		// Commit нужен в любом случае, иначе ожидающие заполнения этого элемента повиснут
+		cd := cachedData{uncached: true}
+		lifetime := proc.ChainLocal.CacheLifetime
+
+		if completed && isCacheable(code, err) {
+			cd = cachedData{
 				headers: maps.Clone(proc.ExtraHeaders),
 				result:  result,
 			}
 			delete(cd.headers, stdhttp.HTTPheaderContentEncoding)
-			ce.Commit(proc.ID, cd, code, proc.ChainLocal.CacheLifetime)
-		}()
+		} else {
+			lifetime = 0
+		}
+
+		ce.Commit(proc.ID, cd, code, lifetime)
+	}()
+
+	result, code, err = proc.get()
+	completed = true
+	return
+}
+
+// Пользователь для ключа кэша -- результат может от него зависеть
+func (proc *ProcOptions) cacheUser() string {
+	if proc.AuthIdentity == nil {
+		return ""
 	}
 
+	return proc.AuthIdentity.User
+}
+
+// Можно ли кэшировать результат
+func isCacheable(code int, err error) bool {
+	if err != nil {
+		return false
+	}
+
+	if code < 0 { // готовый ответ
+		code = -code
+	}
+
+	return code == 0 || code/100 == 2 // StatusProcessed и прочие -- нельзя
+}
+
+// get -- получить данные без использования кэша
+func (proc *ProcOptions) get() (result any, code int, err error) {
 	result, code, err = proc.before()
 	if err != nil {
 		if code == 0 {
@@ -211,12 +279,20 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 		db.Subst(db.SubstJbFields, proc.ChainLocal.Params.DBFields.JbFieldsStr()),
 	)
 
+	rowsOwned := false // Курсор забрал After, вернув результат или код
+
+	defer func() {
+		if !rowsOwned {
+			proc.closeRows()
+		}
+	}()
+
 	for {
 		var res any
 		if proc.ResultAsRows {
 			res = &proc.DBqueryRows
 		} else {
-			srcTp := proc.responseSouceType()
+			srcTp := proc.responseSourceType()
 			proc.DBqueryResult = reflect.New(reflect.SliceOf(srcTp)).Interface()
 			res = proc.DBqueryResult
 		}
@@ -226,7 +302,7 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 			return
 		}
 
-		err = proc.db.QueryTx(proc.dbTx, res, proc.DBqueryName, fields, proc.DBqueryVars)
+		err = queryTx(proc.db, proc.dbTx, res, proc.DBqueryName, fields, proc.DBqueryVars)
 
 		if err != nil {
 			code = http.StatusInternalServerError
@@ -242,25 +318,51 @@ func (proc *ProcOptions) Get() (result any, code int, err error) {
 		}
 
 		if code == StatusRetry {
+			proc.closeRows()
 			continue
 		}
 
 		if code != 0 || !misc.IsNil(result) {
+			rowsOwned = true
 			return
 		}
 
 		break
 	}
 
-	if proc.ChainLocal.Params.Flags&path.FlagResponseIsNotArray != 0 {
+	result, code = proc.queryResult()
+	return
+}
+
+// Закрыть курсор DBqueryRows, если он есть. Повторное закрытие безопасно
+func (proc *ProcOptions) closeRows() {
+	if proc.DBqueryRows == nil {
+		return
+	}
+
+	err := proc.DBqueryRows.Close()
+	if err != nil {
+		Log.Message(log.NOTICE, "[%d] DBqueryRows.Close: %s", proc.ID, err)
+	}
+
+	proc.DBqueryRows = nil
+}
+
+// Результат GET из выполненного запроса
+func (proc *ProcOptions) queryResult() (result any, code int) {
+	switch {
+	case proc.ResultAsRows:
+		// Разбор DBqueryRows -- забота After, раз он ничего не вернул, то и результата нет
+
+	case proc.ChainLocal.Params.Flags&path.FlagResponseIsNotArray != 0:
 		v := reflect.ValueOf(proc.DBqueryResult).Elem()
 		if v.Len() == 0 {
 			code = http.StatusNoContent
 			return
-		} else {
-			result = v.Index(0).Interface()
 		}
-	} else {
+		result = v.Index(0).Interface()
+
+	default:
 		result = proc.DBqueryResult
 	}
 
@@ -437,11 +539,17 @@ func (proc *ProcOptions) checkFields(forUpdate bool, execResult *ExecResult) (su
 	for i, fields := range proc.Fields {
 		// check for required fields
 		for _, dbName := range proc.ChainLocal.Params.Request.RequiredFields {
-			if v, exists := fields[dbName]; !exists {
+			v, exists := fields[dbName]
+			switch {
+			case !exists:
 				if forUpdate {
 					continue
 				}
-			} else {
+
+			case v == nil:
+				// null
+
+			default:
 				vv := reflect.ValueOf(v)
 				if vv.Kind() != reflect.String || !vv.IsZero() {
 					continue
@@ -454,14 +562,23 @@ func (proc *ProcOptions) checkFields(forUpdate bool, execResult *ExecResult) (su
 
 		if forUpdate {
 			// check for key fields
-			for i, dbName := range proc.ChainLocal.Params.Request.UniqueKeyFields {
+			for ki, keyName := range proc.ChainLocal.Params.Request.UniqueKeyFields {
+				// UniqueKeyFields содержит путь до поля, а fields -- db name
+				dbName, exists := proc.ChainLocal.Params.Request.FlatModel[keyName]
+				if !exists {
+					continue
+				}
+				if dbName == "" {
+					dbName = keyName
+				}
+
 				if _, exists := fields[dbName]; !exists {
 					continue
 				}
 
 				delete(fields, dbName)
 				tp := ""
-				if i == 0 {
+				if ki == 0 {
 					tp = "primary "
 				}
 				execResult.Rows[i].AddMessage(`%skey field "%s" ignored`, tp, fieldName(dbName))

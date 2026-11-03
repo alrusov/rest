@@ -3,6 +3,7 @@ package openapi
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"reflect"
@@ -321,17 +322,21 @@ func (proc *processor) serverURL() (server string, err error) {
 		if misc.IsDebug() && proc.httpCfg.DebugAddr != "" {
 			bindAddr = proc.httpCfg.DebugAddr
 		}
-		addr := strings.Split(bindAddr, ":")
+		bindHost, bindPort, e := net.SplitHostPort(bindAddr)
+		if e != nil { // адрес без порта
+			bindHost, bindPort = bindAddr, ""
+		}
+
 		if host == "" {
-			host = addr[0]
-			if host == "" {
+			host = strings.Trim(bindHost, "[]")
+			if ip := net.ParseIP(host); host == "" || (ip != nil && ip.IsUnspecified()) { // слушаем на всех адресах
 				host, _ = os.Hostname()
 			}
 		}
 
 		if port == 0 {
-			if len(addr) > 1 {
-				port, _ = strconv.ParseUint(addr[1], 10, 16)
+			if bindPort != "" {
+				port, _ = strconv.ParseUint(bindPort, 10, 16)
 			}
 			if port == 0 {
 				if protocol == "https" {
@@ -343,7 +348,8 @@ func (proc *processor) serverURL() (server string, err error) {
 		}
 	}
 
-	server = fmt.Sprintf("%s://%s:%d", protocol, host, port)
+	// JoinHostPort сам добавит [] для IPv6
+	server = fmt.Sprintf("%s://%s", protocol, net.JoinHostPort(strings.Trim(host, "[]"), strconv.FormatUint(port, 10)))
 	return
 }
 

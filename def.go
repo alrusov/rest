@@ -71,6 +71,10 @@ type (
 	}
 
 	// Опции запроса к методу
+	//
+	// ВНИМАНИЕ: объект берется из пула и после завершения обработки запроса очищается и переиспользуется для следующих запросов.
+	// Нельзя сохранять указатель на него и обращаться к нему после возврата из обработчиков (Prepare, Before, After, ResultTuner),
+	// например, в запущенной из них горутине -- будет гонка и чужие данные. Нужные значения копируйте заранее.
 	ProcOptions struct {
 		handler            API                 // Интерфейс метода
 		LogFacility        *log.Facility       // Предпочтительная facility для логирования
@@ -92,12 +96,12 @@ type (
 		QueryParams        any                 // Query параметры
 		QueryParamsFound   misc.BoolMap        // Query параметры, присутствующие в запросе в явном виде
 		RequestParams      any                 // Request параметры
-		DBtype             string              // Тип базы, если надо изменить на время запроса. Если пусто, то из info
+		DBtype             string              // Тип базы, если надо изменить на время запроса. Если пусто, то из info. Менять только в Prepare -- далее база уже выбрана и изменение игнорируется
 		db                 *db.DB              // database connection
 		dbTx               *sqlx.Tx            // database transaction
 		DBqueryName        string              // Имя запроса к базе данных
 		DBqueryVars        []any               // Переменные для формирования запроса
-		ResultAsRows       bool                // Возвращать для GET не готовый результат, а *sqlx.Rows, чтобы производить разбор самостоятельно. Актуально для больших результатов.
+		ResultAsRows       bool                // Возвращать для GET не готовый результат, а *sqlx.Rows, чтобы производить разбор самостоятельно. Актуально для больших результатов. Если After вернул результат или код, то закрытие DBqueryRows -- его забота, иначе курсор закрывается автоматически
 		DBqueryResult      any                 // Результат выполненения запроса (указатель на слайс) при ResultAsRows==false
 		DBqueryRows        *sqlx.Rows          // Результат при ResultAsRows==true
 		Fields             []misc.InterfaceMap // Поля (имя из sql запроса) для insert или update. Для select - список полей для выборки из базы, если нужны не все из объекта
@@ -237,8 +241,9 @@ var (
 	modulesMutex sync.RWMutex
 	modules      = map[string]*Module{} // Обработчики API
 
-	tags    = Tags{}
-	tagsMap = map[string]*Tag{}
+	tagsMutex sync.RWMutex
+	tags      = Tags{}
+	tagsMap   = map[string]*Tag{}
 )
 
 //----------------------------------------------------------------------------------------------------------------------------//
@@ -272,6 +277,9 @@ func AddTag(tag *Tag) error {
 		return fmt.Errorf("empty tag name")
 	}
 
+	tagsMutex.Lock()
+	defer tagsMutex.Unlock()
+
 	if _, exists := tagsMap[tag.Name]; exists {
 		return fmt.Errorf("tag %s already exists", tag.Name)
 	}
@@ -293,16 +301,39 @@ func AddTag(tag *Tag) error {
 }
 
 func GetTags() Tags {
-	return tags
+	tagsMutex.RLock()
+	defer tagsMutex.RUnlock()
+
+	return slices.Clone(tags)
 }
 
 func GetTagName(name string) string {
+	tagsMutex.RLock()
+	defer tagsMutex.RUnlock()
+
 	tag, exists := tagsMap[name]
 	if !exists {
 		return ""
 	}
 
 	return tag.Name
+}
+
+// Замена алиасов на имена тегов, неизвестные остаются как есть. Дубликаты удаляются
+func resolveTags(src []string) (dst []string) {
+	dst = make([]string, 0, len(src))
+
+	for _, tag := range src {
+		if name := GetTagName(tag); name != "" {
+			tag = name
+		}
+
+		if !slices.Contains(dst, tag) {
+			dst = append(dst, tag)
+		}
+	}
+
+	return
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//
@@ -321,18 +352,19 @@ func FindSubstArg(vars []any, name string) (subst *db.SubstArg) {
 	return
 }
 
+// Удалить SubstArg с заданным именем. Исходный срез не меняется, если не найден -- возвращается он же
 func DelSubstArg(vars []any, name string) (result []any) {
 	for i, v := range vars {
 		switch vv := v.(type) {
 		case *db.SubstArg:
 			if vv.Name() == name {
-				result = slices.Delete(vars, i, i+1)
+				result = slices.Concat(vars[:i], vars[i+1:])
 				return
 			}
 		}
 	}
 
-	return
+	return vars
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//

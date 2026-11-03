@@ -343,7 +343,7 @@ func (proc *ProcOptions) httpContentType() (tp string) {
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
-func (proc *ProcOptions) responseSouceType() (tp reflect.Type) {
+func (proc *ProcOptions) responseSourceType() (tp reflect.Type) {
 	tp = proc.ChainLocal.Params.Response.SrcType
 	if tp == nil {
 		tp = proc.ChainLocal.Params.Response.Type
@@ -461,11 +461,14 @@ func convert(s string, field reflect.Value) (err error) {
 		return
 
 	case reflect.Bool:
-		s = strings.ToLower(s)
-		b := true
-		switch s {
-		case "0", "n", "no", "f", "false":
+		var b bool
+		switch strings.ToLower(s) {
+		case "", "1", "y", "yes", "t", "true", "on": // пустое -- параметр без значения (?flag)
+			b = true
+		case "0", "n", "no", "f", "false", "off":
 			b = false
+		default:
+			return fmt.Errorf(`conversion error from "%s" to bool`, s)
 		}
 		field.SetBool(b)
 		return
@@ -475,14 +478,14 @@ func convert(s string, field reflect.Value) (err error) {
 
 		switch field.Interface().(type) {
 		default:
-			x, err = strconv.ParseInt(s, 10, 64)
+			x, err = strconv.ParseInt(s, 10, field.Type().Bits())
 
 		case time.Duration:
 			x, err = misc.Interval2Int64(s)
 		}
 
 		if err != nil {
-			return
+			return fmt.Errorf(`conversion error from "%s" to %s (%w)`, s, field.Type(), err)
 		}
 
 		field.SetInt(x)
@@ -490,18 +493,18 @@ func convert(s string, field reflect.Value) (err error) {
 
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		var x uint64
-		x, err = strconv.ParseUint(s, 10, 64)
+		x, err = strconv.ParseUint(s, 10, field.Type().Bits())
 		if err != nil {
-			return fmt.Errorf(`conversion error from "%s" to uint (%w)`, s, err)
+			return fmt.Errorf(`conversion error from "%s" to %s (%w)`, s, field.Type(), err)
 		}
 		field.SetUint(x)
 		return
 
 	case reflect.Float32, reflect.Float64:
 		var x float64
-		x, err = strconv.ParseFloat(s, 64)
+		x, err = strconv.ParseFloat(s, field.Type().Bits())
 		if err != nil {
-			return fmt.Errorf(`conversion error from "%s" to float (%w)`, s, err)
+			return fmt.Errorf(`conversion error from "%s" to %s (%w)`, s, field.Type(), err)
 		}
 		field.SetFloat(x)
 		return
@@ -572,6 +575,7 @@ var (
 	emptyProcOptions = ProcOptions{}
 )
 
+// Очистка и возврат в пул. После этого proc может быть выдан другому запросу -- см. комментарий к ProcOptions
 func (proc *ProcOptions) free() {
 	*proc = emptyProcOptions
 	procOptionsPool.Put(proc)
@@ -598,6 +602,10 @@ func (proc *ProcOptions) GetLocale() (locale string, lang string) {
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
+const (
+	cookieMaxAge = 400 * 24 * 60 * 60 // lifetime in seconds, больше браузеры не допускают (RFC 6265bis)
+)
+
 func (proc *ProcOptions) SetCookie(name string, val string, httpsOnly bool) {
 	if proc == nil {
 		return
@@ -607,9 +615,10 @@ func (proc *ProcOptions) SetCookie(name string, val string, httpsOnly bool) {
 		Name:     name,
 		Path:     "/",
 		Value:    val,
-		MaxAge:   999999999, // lifetime in seconds
-		HttpOnly: true,      // XSS protection
-		Secure:   httpsOnly, // HTTPS only
+		MaxAge:   cookieMaxAge,
+		HttpOnly: true,                 // XSS protection
+		Secure:   httpsOnly,            // HTTPS only
+		SameSite: http.SameSiteLaxMode, // CSRF protection
 	}
 
 	http.SetCookie(proc.W, cookie)

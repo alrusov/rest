@@ -3,6 +3,7 @@ module github.com/alrusov/rest/v4
 go 1.26.3
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/alrusov/auth v0.1.11
 	github.com/alrusov/cache v0.1.5
 	github.com/alrusov/config v0.1.69
@@ -17,7 +18,6 @@ require (
 )
 
 require (
-	github.com/DATA-DOG/go-sqlmock v1.5.2 // indirect
 	github.com/alrusov/initializer v0.1.3 // indirect
 	github.com/alrusov/loadavg v0.1.6 // indirect
 	github.com/alrusov/panic v0.1.16 // indirect

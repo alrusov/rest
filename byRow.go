@@ -50,17 +50,25 @@ const (
 )
 
 var (
-	ByRowDefautlBegin     = []byte{'['}
-	ByRowDefautlEnd       = []byte{']'}
+	ByRowDefaultBegin     = []byte{'['}
+	ByRowDefaultEnd       = []byte{']'}
 	ByRowDefaultSeparator = []byte{','}
+
+	// Раньше имена были с ошибкой (Defautl), оставлены для совместимости.
+	// Это отдельные переменные: присваивание им нового значения на NewByRow не влияет.
+	//
+	// Deprecated: используйте ByRowDefaultBegin.
+	ByRowDefautlBegin = ByRowDefaultBegin
+	// Deprecated: используйте ByRowDefaultEnd.
+	ByRowDefautlEnd = ByRowDefaultEnd
 )
 
 //----------------------------------------------------------------------------------------------------------------------------//
 
 func NewByRow(proc *ProcOptions, tuner ByRowTuner, withWriter bool) (br *ByRow, err error) {
 	br = &ByRow{
-		Begin:      ByRowDefautlBegin,
-		End:        ByRowDefautlEnd,
+		Begin:      ByRowDefaultBegin,
+		End:        ByRowDefaultEnd,
 		RowNum:     0,
 		IsFinal:    false,
 		withWriter: withWriter,
@@ -109,7 +117,7 @@ func (br *ByRow) Do() (err error) {
 
 	rows := br.proc.DBqueryRows
 
-	srcTp := br.proc.responseSouceType()
+	srcTp := br.proc.responseSourceType()
 
 	// Обработка
 
@@ -291,7 +299,13 @@ func (br *ByRow) Close() (err error) {
 		}
 	}
 
-	if br.RowNum != 0 {
+	if br.failed && br.blockNum == 0 {
+		// Ничего еще не отправлено -- отбрасываем накопленное, чтобы вызывающий мог вернуть ошибку
+		br.buf.Reset()
+		if br.withGzip {
+			delete(br.proc.ExtraHeaders, stdhttp.HTTPheaderContentEncoding)
+		}
+	} else if br.RowNum != 0 {
 		err = br.Flush()
 		if err != nil {
 			msgs.AddError(err)

@@ -1,8 +1,11 @@
 package path
 
 import (
+	"net/http"
 	"reflect"
 	"testing"
+
+	"github.com/alrusov/stdhttp"
 )
 
 //----------------------------------------------------------------------------------------------------------------------------//
@@ -367,6 +370,58 @@ func TestParser(t *testing.T) {
 				}
 			}
 		*/
+	}
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+func TestFindPathParamsConvertError(t *testing.T) {
+	c := &Chains{
+		StdParams: Params{
+			PathParamsPattern: struct{ ID uint64 }{},
+		},
+		Chains: []*Chain{
+			{
+				Name: "id",
+				Tokens: []*Token{
+					{Expr: `\d+`, VarName: `ID`},
+				},
+			},
+		},
+	}
+
+	err := c.Prepare(stdhttp.MethodGET)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name     string
+		path     []string
+		code     int
+		hasError bool
+	}{
+		{"ok", []string{"123"}, 0, false},
+		{"overflow", []string{"99999999999999999999"}, http.StatusNotFound, true},
+		{"not matched", []string{"abc"}, http.StatusNotFound, false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			matched, _, code, err := c.Find(tc.path)
+
+			if code != tc.code {
+				t.Errorf("got code %d, expected %d", code, tc.code)
+			}
+
+			if (err != nil) != tc.hasError {
+				t.Errorf(`got error "%v", expected error: %v`, err, tc.hasError)
+			}
+
+			if (matched != nil) != (tc.code == 0) {
+				t.Errorf("got matched %v, expected matched: %v", matched != nil, tc.code == 0)
+			}
+		})
 	}
 }
 
