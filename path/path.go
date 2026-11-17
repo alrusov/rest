@@ -338,7 +338,9 @@ func (chains *Chains) Prepare(m string) (err error) {
 		return
 	}
 
-	sort.Sort(chains)
+	// Стабильная сортировка: среди цепочек, равных по Less, сохраняется порядок объявления.
+	// От него зависит выбор маршрута, когда путь подходит под несколько цепочек одной длины.
+	sort.Stable(chains)
 
 	chains.prepared = true
 	return
@@ -467,7 +469,9 @@ func (chains *Chains) Less(i, j int) bool {
 		return chains.Chains[j].Tokens[0].Expr != ""
 	}
 
-	return i < j
+	// Равные цепочки: порядок задаёт sort.Stable. i и j -- текущие позиции в срезе, а не порядок объявления,
+	// поэтому сравнивать их нельзя.
+	return false
 }
 
 func (c *Chains) Swap(i, j int) {
