@@ -6,13 +6,13 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/alrusov/auth v0.1.11
 	github.com/alrusov/cache v0.1.5
-	github.com/alrusov/config v0.1.72
+	github.com/alrusov/config v0.1.73
 	github.com/alrusov/db v0.1.63
 	github.com/alrusov/jsonw v0.1.3
 	github.com/alrusov/log v0.1.40
 	github.com/alrusov/misc v1.1.38
 	github.com/alrusov/shaping v0.1.3
-	github.com/alrusov/stdhttp v0.1.132
+	github.com/alrusov/stdhttp v0.1.133
 	github.com/getkin/kin-openapi v0.152.0
 	github.com/jmoiron/sqlx v1.4.0
 )
