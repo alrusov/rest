@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alrusov/config"
 	"github.com/alrusov/jsonw"
 	"github.com/alrusov/log"
 	"github.com/alrusov/misc"
@@ -153,7 +154,7 @@ func (proc *ProcOptions) readBody() (code int, err error) {
 			err = jsonw.Unmarshal(proc.RawBody, &proc.RequestParams)
 			if err != nil {
 				code = http.StatusUnprocessableEntity
-				Log.Message(log.ERR, "%s\n%v\n%s", err, proc.R.Header, proc.RawBody)
+				Log.Message(log.ERR, "%s", bodyParseErrorMessage(proc, err))
 				return
 			}
 		}
@@ -634,6 +635,15 @@ func (proc *ProcOptions) GetCookie(name string) (val string) {
 	}
 
 	return
+}
+
+//----------------------------------------------------------------------------------------------------------------------------//
+
+// Сообщение об ошибке разбора тела запроса для журнала ERR: без заголовков (Authorization) и без тела
+// (пароли в JSON) -- они пишутся замаскированными на TRACE3/TRACE4 (stdhttp)
+func bodyParseErrorMessage(proc *ProcOptions, err error) string {
+	return config.SecureText(fmt.Sprintf(`[%d] %s "%s": request body parse error: %s (Content-Type "%s", %d bytes)`,
+		proc.ID, proc.R.Method, proc.R.RequestURI, err, proc.R.Header.Get("Content-Type"), len(proc.RawBody)))
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//
