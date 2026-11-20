@@ -643,7 +643,28 @@ func (proc *ProcOptions) GetCookie(name string) (val string) {
 // (пароли в JSON) -- они пишутся замаскированными на TRACE3/TRACE4 (stdhttp)
 func bodyParseErrorMessage(proc *ProcOptions, err error) string {
 	return config.SecureText(fmt.Sprintf(`[%d] %s "%s": request body parse error: %s (Content-Type "%s", %d bytes)`,
-		proc.ID, proc.R.Method, proc.R.RequestURI, err, proc.R.Header.Get("Content-Type"), len(proc.RawBody)))
+		proc.ID, proc.R.Method, proc.R.RequestURI, parseErrorText(err), proc.R.Header.Get("Content-Type"), len(proc.RawBody)))
+}
+
+// Признак контекста json-iterator в тексте ошибки: "…, error found in #N byte of ...|<тело>|..., bigger context ...|<тело>|..."
+const jsonContextMarker = ", error found in #"
+
+// Текст ошибки разбора без фрагментов тела: окна json-iterator режутся посреди ключа, и маскировщик
+// по имени ключа их не узнаёт (idc/docs#346); номер байта остаётся для поиска места ошибки
+func parseErrorText(err error) string {
+	msg := err.Error()
+
+	i := strings.Index(msg, jsonContextMarker)
+	if i < 0 {
+		return msg
+	}
+
+	pos := msg[i+len(jsonContextMarker):]
+	if j := strings.IndexByte(pos, ' '); j >= 0 {
+		pos = pos[:j]
+	}
+
+	return msg[:i] + ", error found in #" + pos + " byte (body fragment omitted)"
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//
