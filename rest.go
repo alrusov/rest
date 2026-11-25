@@ -301,8 +301,12 @@ func (proc *ProcOptions) get() (result any, code int, err error) {
 		if proc.ResultAsRows {
 			res = &proc.DBqueryRows
 		} else {
-			srcTp := proc.responseSourceType()
-			proc.DBqueryResult = reflect.New(reflect.SliceOf(srcTp)).Interface()
+			sliceTp := reflect.SliceOf(proc.responseSourceType())
+			pv := reflect.New(sliceTp)
+			if proc.DBqueryResultCap > 0 {
+				pv.Elem().Set(reflect.MakeSlice(sliceTp, 0, proc.DBqueryResultCap))
+			}
+			proc.DBqueryResult = pv.Interface()
 			res = proc.DBqueryResult
 		}
 

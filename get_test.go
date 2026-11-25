@@ -2,6 +2,7 @@ package rest
 
 import (
 	"fmt"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -147,3 +148,53 @@ func TestGetRowsClose(t *testing.T) {
 }
 
 //----------------------------------------------------------------------------------------------------------------------------//
+
+// Приемник выборки выделяется с ёмкостью DBqueryResultCap, без подсказки -- пустым (idc/docs#1004)
+func TestGetResultCap(t *testing.T) {
+	fields, err := db.MakeFieldsList(byRowItem{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, hint := range []int{0, -5, 1, 1000} {
+		t.Run(fmt.Sprint(hint), func(t *testing.T) {
+			var got any
+
+			old := queryTx
+			t.Cleanup(func() { queryTx = old })
+
+			queryTx = func(_ *db.DB, _ *sqlx.Tx, dest any, _ string, _ []string, _ []any) (err error) {
+				got = dest
+				return
+			}
+
+			proc := &ProcOptions{
+				handler: testAPI{},
+				Info: &Info{
+					After: func(proc *ProcOptions) (result any, code int, err error) {
+						return nil, StatusProcessed, nil
+					},
+				},
+				db:               &db.DB{},
+				DBqueryResultCap: hint,
+			}
+			proc.ChainLocal.Params.DBFields = fields
+			proc.ChainLocal.Params.Response.Type = reflect.TypeFor[byRowItem]()
+
+			_, _, err := proc.get()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			dest, ok := got.(*[]byRowItem)
+			if !ok || dest != proc.DBqueryResult {
+				t.Fatalf("dest is %T, expected %T stored in DBqueryResult", got, dest)
+			}
+
+			expected := max(hint, 0)
+			if len(*dest) != 0 || cap(*dest) != expected {
+				t.Errorf("got len %d cap %d, expected len 0 cap %d", len(*dest), cap(*dest), expected)
+			}
+		})
+	}
+}
